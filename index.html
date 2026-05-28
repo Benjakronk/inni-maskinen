@@ -67,16 +67,17 @@
             background: none !important;
             border: none !important;
             box-shadow: none !important;
-            padding: 80px 20px 80px !important;
+            padding: 20px 20px 20px !important;
             border-radius: 0 !important;
-            perspective: 2400px;
-            perspective-origin: 50% 32%;
+            perspective: 2600px;
+            perspective-origin: 50% 38%;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 1100px;
+            min-height: 78vh;
             cursor: grab;
             user-select: none;
+            overflow: hidden;
         }
         .computer.dragging { cursor: grabbing; }
 
@@ -85,18 +86,22 @@
             --rot-z: 0deg;
             --zoom: 1;
             --open: 0;
+            --fit-scale: 0.62;
 
             position: relative;
             width: 1020px;
             height: 928px;
             transform-style: preserve-3d;
             transform:
-                scale(var(--zoom))
+                scale(calc(var(--fit-scale) * var(--zoom)))
                 rotateX(calc(56deg + var(--rot-x)))
                 rotateZ(var(--rot-z));
             transition: transform 0.3s ease-out;
             will-change: transform;
         }
+        @media (max-height: 820px) { .case { --fit-scale: 0.55; } }
+        @media (max-height: 700px) { .case { --fit-scale: 0.48; } }
+        @media (max-height: 600px) { .case { --fit-scale: 0.42; } }
         .case.no-transition { transition: none; }
 
         .case-face {
@@ -125,7 +130,7 @@
             transform-origin: 50% 0%;
             transform:
                 translateZ(280px)
-                rotateX(calc(var(--open) * 118deg));
+                rotateX(calc(var(--open) * 100deg));
             transition: transform 0.75s cubic-bezier(0.55, 0, 0.2, 1);
             background:
                 radial-gradient(ellipse at 30% 30%, #3a3a44 0%, #1a1a22 60%, #0e0e14 100%);
@@ -261,28 +266,85 @@
             border: 2px solid #050507;
         }
 
-        /* Komponenter løftes opp fra PCB-en */
+        /* ============ 3D-komponenter (chips på PCB-en) ============ */
         .component {
+            --chip-h: 34px;
             transform-style: preserve-3d;
-            transform: translateZ(34px);
+            transform: translateZ(var(--chip-h));
             transition: transform 0.18s ease, filter 0.18s ease;
         }
+        /* Bunnskygge på PCB rett under chip-en */
         .component::after {
             content: '';
             position: absolute;
-            inset: 0;
-            border-radius: 8px;
-            box-shadow:
-                0 6px 0 rgba(0,0,0,0.5),
-                0 16px 24px rgba(0,0,0,0.45);
-            transform: translateZ(-17px);
+            inset: -4px;
+            border-radius: 10px;
+            background: rgba(0,0,0,0.4);
+            filter: blur(6px);
+            transform: translateZ(calc(var(--chip-h) * -1 + 0.5px));
             pointer-events: none;
             z-index: -1;
         }
         .component:hover {
-            transform: translateZ(56px) scale(1.04);
+            transform: translateZ(var(--chip-h)) scale(1.06);
             filter: brightness(1.18) drop-shadow(0 12px 16px rgba(0,0,0,0.5));
             z-index: 10;
+        }
+
+        /* Sideveggene som gir chip-en dybde */
+        .chip-wall {
+            position: absolute;
+            background: linear-gradient(180deg, #3a2f22 0%, #1f1810 60%, #0a0807 100%);
+            border: 1px solid #050403;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+        .wall-north {
+            top: 0; left: 0; right: 0;
+            height: var(--chip-h);
+            transform-origin: 50% 0%;
+            transform: rotateX(-90deg);
+        }
+        .wall-south {
+            bottom: 0; left: 0; right: 0;
+            height: var(--chip-h);
+            transform-origin: 50% 100%;
+            transform: rotateX(90deg);
+        }
+        .wall-east {
+            top: 0; bottom: 0; right: 0;
+            width: var(--chip-h);
+            transform-origin: 100% 50%;
+            transform: rotateY(-90deg);
+            background: linear-gradient(90deg, #3a2f22 0%, #1f1810 60%, #0a0807 100%);
+        }
+        .wall-west {
+            top: 0; bottom: 0; left: 0;
+            width: var(--chip-h);
+            transform-origin: 0% 50%;
+            transform: rotateY(90deg);
+            background: linear-gradient(90deg, #0a0807 0%, #1f1810 40%, #3a2f22 100%);
+        }
+
+        /* Per-komponent-dybder — gir variasjon i 3D-fasong */
+        .c-ram  { --chip-h: 78px; }   /* RAM-sticks står høyt opp */
+        .c-cpu  { --chip-h: 24px; }   /* CPU-heatspreader er flat */
+        .c-bus  { --chip-h: 10px; }   /* bussen er nesten flat */
+        .c-disk { --chip-h: 42px; }
+        .c-gpu  { --chip-h: 48px; }   /* skjermkort med kjøler */
+        .c-bits { --chip-h: 32px; }
+        .c-net  { --chip-h: 26px; }
+        .c-os   { --chip-h: 28px; }
+        .c-kode { --chip-h: 28px; }
+        .c-komp { --chip-h: 24px; }
+
+        /* RAM-sticks: gylne kontakter på de vertikale veggene */
+        .c-ram .chip-wall {
+            background: linear-gradient(180deg, #1a1410 0%, #0e0a08 40%, #d4a040 92%, #8a6020 100%);
+        }
+        /* GPU-kjølerøyt: rødlig metall */
+        .c-gpu .chip-wall {
+            background: linear-gradient(180deg, #4a2222 0%, #1a1010 60%, #0a0707 100%);
         }
         /* Komponentene skal være uklikkbare før lokket åpnes */
         .case[data-open="false"] .component { pointer-events: none; }
@@ -330,13 +392,8 @@
             letter-spacing: 1px;
         }
 
-        @media (max-width: 1100px) {
-            .case { transform: scale(calc(var(--zoom) * 0.82)) rotateX(calc(56deg + var(--rot-x))) rotateZ(var(--rot-z)); }
-        }
-        @media (max-width: 880px) {
-            .case { transform: scale(calc(var(--zoom) * 0.6)) rotateX(calc(56deg + var(--rot-x))) rotateZ(var(--rot-z)); }
-            .computer { min-height: 800px; padding: 40px 10px !important; }
-        }
+        @media (max-width: 1100px) { .case { --fit-scale: 0.55; } }
+        @media (max-width: 880px)  { .case { --fit-scale: 0.45; } }
         @media (max-width: 720px) {
             .wires { display: none; }
             .computer { perspective: none; min-height: auto; padding: 0 !important; cursor: default; }
@@ -661,6 +718,15 @@
         // Tegn stjerner pr. komponent + total
         document.querySelectorAll('.stars[data-room]').forEach(el => {
             el.innerHTML = Progress.renderStars(el.dataset.room);
+        });
+
+        // Bygg 3D-chip rundt hver komponent (4 sidevegger)
+        document.querySelectorAll('.computer .component').forEach(c => {
+            ['north', 'south', 'east', 'west'].forEach(dir => {
+                const w = document.createElement('div');
+                w.className = 'chip-wall wall-' + dir;
+                c.appendChild(w);
+            });
         });
         const total = Progress.total();
         document.getElementById('hub-progress').innerHTML =
