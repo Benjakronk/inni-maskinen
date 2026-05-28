@@ -62,57 +62,302 @@
         }
         .component { z-index: 2; }
 
-        /* ============ 3D-tilt på hovedkortet ============ */
+        /* ============ 3D-skap: bordmaskin som åpnes ============ */
         .computer {
-            perspective: 1400px;
-            perspective-origin: 50% 30%;
+            background: none !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 80px 20px 80px !important;
+            border-radius: 0 !important;
+            perspective: 2400px;
+            perspective-origin: 50% 32%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 1100px;
+            cursor: grab;
+            user-select: none;
         }
-        .motherboard {
+        .computer.dragging { cursor: grabbing; }
+
+        .case {
+            --rot-x: 0deg;
+            --rot-z: 0deg;
+            --zoom: 1;
+            --open: 0;
+
+            position: relative;
+            width: 1020px;
+            height: 928px;
             transform-style: preserve-3d;
             transform:
-                rotateX(calc(18deg + var(--tilt-x, 0deg)))
-                rotateZ(calc(-3deg + var(--tilt-z, 0deg)));
-            transition: transform 0.25s ease-out;
+                scale(var(--zoom))
+                rotateX(calc(56deg + var(--rot-x)))
+                rotateZ(var(--rot-z));
+            transition: transform 0.3s ease-out;
             will-change: transform;
         }
-        .motherboard::before,
-        .motherboard::after,
-        .wires { transform: translateZ(0.1px); }
+        .case.no-transition { transition: none; }
 
-        /* Hver komponent løftes opp fra PCB-en med en synlig "side" */
+        .case-face {
+            position: absolute;
+            box-sizing: border-box;
+            transform-style: preserve-3d;
+        }
+
+        /* Bunnen: her sitter hovedkortet */
+        .face-floor {
+            inset: 0;
+            background: linear-gradient(180deg, #1f1656 0%, #150d3a 100%);
+            box-shadow: inset 0 0 80px rgba(0,0,0,0.55);
+            border-radius: 6px;
+        }
+        .face-floor > .motherboard {
+            position: absolute;
+            inset: 0;
+            margin: 0;
+            transform-style: preserve-3d;
+        }
+
+        /* Topp-lokk: åpnes på bak-hengsel */
+        .face-lid {
+            inset: 0;
+            transform-origin: 50% 0%;
+            transform:
+                translateZ(280px)
+                rotateX(calc(var(--open) * 118deg));
+            transition: transform 0.75s cubic-bezier(0.55, 0, 0.2, 1);
+            background:
+                radial-gradient(ellipse at 30% 30%, #3a3a44 0%, #1a1a22 60%, #0e0e14 100%);
+            border: 4px solid #050507;
+            border-radius: 6px;
+            box-shadow:
+                inset 0 0 0 2px #2a2a32,
+                inset 0 0 80px rgba(0,0,0,0.5);
+        }
+        .lid-brand {
+            position: absolute;
+            top: 36px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: monospace;
+            font-size: 1.4em;
+            letter-spacing: 8px;
+            color: rgba(255,255,255,0.55);
+            text-shadow: 0 0 14px rgba(75,225,255,0.35);
+            backface-visibility: hidden;
+        }
+        .lid-vents {
+            position: absolute;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 460px;
+            height: 18px;
+            background:
+                repeating-linear-gradient(90deg,
+                    transparent 0 6px,
+                    rgba(0,0,0,0.7) 6px 9px);
+            border-radius: 4px;
+            backface-visibility: hidden;
+        }
+        .lid-power {
+            position: absolute;
+            top: 38px;
+            right: 80px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #4be1ff 0%, #2a8aa8 60%, #0a3a48 100%);
+            box-shadow: 0 0 12px rgba(75,225,255,0.7);
+            backface-visibility: hidden;
+            animation: power-pulse 2.4s ease-in-out infinite;
+        }
+        @keyframes power-pulse {
+            0%, 100% { box-shadow: 0 0 8px rgba(75,225,255,0.5); }
+            50%      { box-shadow: 0 0 18px rgba(75,225,255,0.9); }
+        }
+        .lid-inside {
+            position: absolute;
+            inset: 14px;
+            border-radius: 3px;
+            background:
+                repeating-linear-gradient(45deg,
+                    rgba(255,255,255,0.025) 0 6px,
+                    transparent 6px 18px),
+                linear-gradient(180deg, #1a1a22 0%, #0a0a10 100%);
+            transform: rotateY(180deg);
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(255,255,255,0.25);
+            font-family: monospace;
+            font-size: 0.85em;
+            letter-spacing: 4px;
+        }
+
+        /* Veggene */
+        .face-back {
+            left: 0; top: 0;
+            width: 1020px;
+            height: 280px;
+            transform-origin: 50% 0%;
+            transform: rotateX(90deg);
+            background: linear-gradient(180deg, #2a2a30 0%, #15151a 100%);
+            border: 2px solid #050507;
+        }
+        .face-front {
+            left: 0; bottom: 0;
+            width: 1020px;
+            height: 280px;
+            transform-origin: 50% 100%;
+            transform: rotateX(-90deg);
+            background: linear-gradient(180deg, #2a2a30 0%, #15151a 100%);
+            border: 2px solid #050507;
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            padding: 0 60px;
+            color: rgba(255,255,255,0.6);
+            font-family: monospace;
+        }
+        .face-front .badge {
+            font-size: 0.85em;
+            letter-spacing: 4px;
+        }
+        .face-front .drive-bay {
+            flex: 0 0 auto;
+            width: 140px;
+            height: 24px;
+            background: linear-gradient(180deg, #0a0a10 0%, #1a1a22 100%);
+            border: 1px solid #050507;
+            border-radius: 3px;
+            box-shadow: inset 0 0 6px rgba(0,0,0,0.7);
+        }
+        .face-front .led {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #6cff8c;
+            box-shadow: 0 0 6px rgba(108,255,140,0.8);
+        }
+        .face-side-l {
+            left: 0; top: 0;
+            width: 280px;
+            height: 928px;
+            transform-origin: 0% 50%;
+            transform: rotateY(-90deg);
+            background: linear-gradient(90deg, #15151a 0%, #25252a 100%);
+            border: 2px solid #050507;
+        }
+        .face-side-r {
+            right: 0; top: 0;
+            width: 280px;
+            height: 928px;
+            transform-origin: 100% 50%;
+            transform: rotateY(90deg);
+            background: linear-gradient(90deg, #25252a 0%, #15151a 100%);
+            border: 2px solid #050507;
+        }
+
+        /* Komponenter løftes opp fra PCB-en */
         .component {
             transform-style: preserve-3d;
-            transform: translateZ(28px);
+            transform: translateZ(34px);
             transition: transform 0.18s ease, filter 0.18s ease;
         }
-        /* Falsk side-vegg: mørk skygge ned mot PCB */
         .component::after {
             content: '';
             position: absolute;
             inset: 0;
             border-radius: 8px;
             box-shadow:
-                0 6px 0 rgba(0,0,0,0.55),
-                0 14px 22px rgba(0,0,0,0.5);
-            transform: translateZ(-14px);
+                0 6px 0 rgba(0,0,0,0.5),
+                0 16px 24px rgba(0,0,0,0.45);
+            transform: translateZ(-17px);
             pointer-events: none;
             z-index: -1;
         }
         .component:hover {
-            transform: translateZ(48px) scale(1.03);
-            filter: brightness(1.18) drop-shadow(0 10px 14px rgba(0,0,0,0.5));
+            transform: translateZ(56px) scale(1.04);
+            filter: brightness(1.18) drop-shadow(0 12px 16px rgba(0,0,0,0.5));
             z-index: 10;
         }
+        /* Komponentene skal være uklikkbare før lokket åpnes */
+        .case[data-open="false"] .component { pointer-events: none; }
 
+        /* ============ Kontrollpanel ============ */
+        .hub-controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 10px 22px;
+            margin: 0 auto 14px;
+            padding: 10px 16px;
+            background: rgba(26, 17, 71, 0.55);
+            border: 1px solid rgba(75,225,255,0.22);
+            border-radius: 10px;
+            backdrop-filter: blur(4px);
+            max-width: 900px;
+        }
+        .hub-controls label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: monospace;
+            font-size: 0.75em;
+            color: var(--ink-soft);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+        .hub-controls input[type=range] {
+            width: 120px;
+            accent-color: var(--neon-cyan);
+        }
+        .hub-controls .btn {
+            padding: 6px 14px;
+            font-size: 0.82em;
+        }
+        .hub-hint {
+            text-align: center;
+            font-family: monospace;
+            font-size: 0.72em;
+            color: var(--ink-soft);
+            opacity: 0.7;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        @media (max-width: 1100px) {
+            .case { transform: scale(calc(var(--zoom) * 0.82)) rotateX(calc(56deg + var(--rot-x))) rotateZ(var(--rot-z)); }
+        }
+        @media (max-width: 880px) {
+            .case { transform: scale(calc(var(--zoom) * 0.6)) rotateX(calc(56deg + var(--rot-x))) rotateZ(var(--rot-z)); }
+            .computer { min-height: 800px; padding: 40px 10px !important; }
+        }
         @media (max-width: 720px) {
             .wires { display: none; }
-            /* Slå av tilt på mobil — flatt og klikkbart */
-            .motherboard { transform: none; }
+            .computer { perspective: none; min-height: auto; padding: 0 !important; cursor: default; }
+            .case {
+                width: 100%;
+                height: auto;
+                transform: none !important;
+                transform-style: flat;
+            }
+            .face-back, .face-front, .face-side-l, .face-side-r, .face-lid { display: none; }
+            .face-floor { position: relative; }
+            .face-floor > .motherboard { position: relative; }
+            .case[data-open="false"] .component { pointer-events: auto; }
             .component { transform: none; }
             .component::after { display: none; }
+            .hub-controls, .hub-hint { display: none; }
         }
         @media (prefers-reduced-motion: reduce) {
-            .motherboard { transition: none; }
+            .case { transition: none; }
+            .face-lid { transition: none; }
+            .lid-power { animation: none; }
         }
 
         .startup-overlay {
@@ -170,7 +415,35 @@
                 <div class="hub-progress" id="hub-progress"></div>
             </div>
 
+            <div class="hub-controls">
+                <button id="open-toggle" class="btn pink" type="button">Åpne sidepanelet</button>
+                <label>Rotasjon
+                    <input id="ctrl-roty" type="range" min="-45" max="45" value="0" step="1">
+                </label>
+                <label>Vinkel
+                    <input id="ctrl-rotx" type="range" min="-25" max="25" value="0" step="1">
+                </label>
+                <label>Zoom
+                    <input id="ctrl-zoom" type="range" min="60" max="120" value="100" step="2">
+                </label>
+                <button id="reset-view" class="btn outline" type="button">Tilbakestill</button>
+            </div>
+            <div class="hub-hint">Dra på maskinen for å rotere · bruk sliderne for presisjon</div>
+
             <div class="computer">
+                <div class="case" data-open="false">
+
+                    <div class="case-face face-back"></div>
+                    <div class="case-face face-side-l"></div>
+                    <div class="case-face face-side-r"></div>
+                    <div class="case-face face-front">
+                        <div class="badge">INNI MASKINEN</div>
+                        <div class="drive-bay"></div>
+                        <div class="drive-bay"></div>
+                        <div class="led"></div>
+                    </div>
+
+                    <div class="case-face face-floor">
                 <div class="motherboard">
 
                     <svg class="wires" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -353,6 +626,16 @@
                     </a>
 
                 </div>
+                    </div><!-- /.face-floor -->
+
+                    <div class="case-face face-lid">
+                        <div class="lid-brand">INNI MASKINEN</div>
+                        <div class="lid-vents"></div>
+                        <div class="lid-power"></div>
+                        <div class="lid-inside">← åpent sidepanel ·  kabelkanaler  ·  isolasjonsskum →</div>
+                    </div>
+
+                </div><!-- /.case -->
             </div>
 
             <footer class="tiny">Krymp · Klikk · Lær · © 2026</footer>
@@ -408,38 +691,102 @@
         }
         welcome();
 
-        // ============ Musefølgende 3D-tilt på hovedkortet ============
+        // ============ 3D-case-kontroller ============
         (function () {
-            if (window.matchMedia('(max-width: 720px)').matches) return;
-            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-            const board = document.querySelector('.motherboard');
-            const stage = document.querySelector('.hub-stage');
-            if (!board || !stage) return;
+            const computer  = document.querySelector('.computer');
+            const caseEl    = document.querySelector('.case');
+            const btnOpen   = document.getElementById('open-toggle');
+            const btnReset  = document.getElementById('reset-view');
+            const sliderY   = document.getElementById('ctrl-roty');
+            const sliderX   = document.getElementById('ctrl-rotx');
+            const sliderZ   = document.getElementById('ctrl-zoom');
+            if (!caseEl || !computer) return;
 
-            const MAX_X = 7;
-            const MAX_Z = 9;
-            let raf = 0;
+            const state = { rotY: 0, rotX: 0, zoom: 1, open: false };
+            const isMobile = window.matchMedia('(max-width: 720px)').matches;
 
-            function onMove(e) {
-                if (raf) return;
-                raf = requestAnimationFrame(() => {
-                    raf = 0;
-                    const r = stage.getBoundingClientRect();
-                    const cx = e.clientX - r.left - r.width / 2;
-                    const cy = e.clientY - r.top - r.height / 2;
-                    const nx = Math.max(-1, Math.min(1, cx / (r.width / 2)));
-                    const ny = Math.max(-1, Math.min(1, cy / (r.height / 2)));
-                    board.style.setProperty('--tilt-x', (-ny * MAX_X) + 'deg');
-                    board.style.setProperty('--tilt-z', (nx * MAX_Z) + 'deg');
+            function apply() {
+                caseEl.style.setProperty('--rot-z', state.rotY + 'deg');
+                caseEl.style.setProperty('--rot-x', state.rotX + 'deg');
+                caseEl.style.setProperty('--zoom', state.zoom);
+                caseEl.style.setProperty('--open', state.open ? 1 : 0);
+                caseEl.dataset.open = state.open ? 'true' : 'false';
+                btnOpen.textContent = state.open ? 'Lukk sidepanelet' : 'Åpne sidepanelet';
+            }
+
+            function setOpen(open) {
+                state.open = open;
+                if (open) sessionStorage.setItem('im_case_open', '1');
+                else sessionStorage.removeItem('im_case_open');
+                apply();
+            }
+
+            // Åpne automatisk hvis brukeren allerede har åpnet denne økten
+            if (sessionStorage.getItem('im_case_open')) state.open = true;
+            apply();
+
+            // ---- Knapper ----
+            btnOpen.addEventListener('click', () => setOpen(!state.open));
+            btnReset.addEventListener('click', () => {
+                state.rotY = 0; state.rotX = 0; state.zoom = 1;
+                sliderY.value = 0; sliderX.value = 0; sliderZ.value = 100;
+                apply();
+            });
+
+            // ---- Slidere ----
+            sliderY.addEventListener('input', e => { state.rotY = +e.target.value; apply(); });
+            sliderX.addEventListener('input', e => { state.rotX = +e.target.value; apply(); });
+            sliderZ.addEventListener('input', e => { state.zoom = e.target.value / 100; apply(); });
+
+            // ---- Drag-to-rotate ----
+            if (!isMobile) {
+                let dragging = false, startX = 0, startY = 0, baseRotY = 0, baseRotX = 0;
+                const DRAG_SENS = 0.3; // deg per piksel
+
+                computer.addEventListener('pointerdown', e => {
+                    // Ikke drag når man trykker på en komponent eller kontroll
+                    if (e.target.closest('.component')) return;
+                    if (e.target.closest('.hub-controls')) return;
+                    dragging = true;
+                    startX = e.clientX; startY = e.clientY;
+                    baseRotY = state.rotY; baseRotX = state.rotX;
+                    computer.classList.add('dragging');
+                    caseEl.classList.add('no-transition');
+                    computer.setPointerCapture(e.pointerId);
                 });
-            }
-            function onLeave() {
-                board.style.setProperty('--tilt-x', '0deg');
-                board.style.setProperty('--tilt-z', '0deg');
+                computer.addEventListener('pointermove', e => {
+                    if (!dragging) return;
+                    const dx = (e.clientX - startX) * DRAG_SENS;
+                    const dy = (e.clientY - startY) * DRAG_SENS;
+                    state.rotY = Math.max(-45, Math.min(45, baseRotY + dx));
+                    state.rotX = Math.max(-25, Math.min(25, baseRotX - dy));
+                    sliderY.value = Math.round(state.rotY);
+                    sliderX.value = Math.round(state.rotX);
+                    apply();
+                });
+                function endDrag(e) {
+                    if (!dragging) return;
+                    dragging = false;
+                    computer.classList.remove('dragging');
+                    caseEl.classList.remove('no-transition');
+                    try { computer.releasePointerCapture(e.pointerId); } catch (_) {}
+                }
+                computer.addEventListener('pointerup', endDrag);
+                computer.addEventListener('pointercancel', endDrag);
             }
 
-            window.addEventListener('mousemove', onMove, { passive: true });
-            stage.addEventListener('mouseleave', onLeave);
+            // ---- Tastatur: piltaster justerer ----
+            document.addEventListener('keydown', e => {
+                if (e.target.matches('input, textarea')) return;
+                let handled = true;
+                if (e.key === 'ArrowLeft')  { state.rotY = Math.max(-45, state.rotY - 3); sliderY.value = state.rotY; }
+                else if (e.key === 'ArrowRight') { state.rotY = Math.min( 45, state.rotY + 3); sliderY.value = state.rotY; }
+                else if (e.key === 'ArrowUp')    { state.rotX = Math.max(-25, state.rotX - 3); sliderX.value = state.rotX; }
+                else if (e.key === 'ArrowDown')  { state.rotX = Math.min( 25, state.rotX + 3); sliderX.value = state.rotX; }
+                else if (e.key === ' ' || e.key === 'Enter' && e.target === document.body) { setOpen(!state.open); }
+                else handled = false;
+                if (handled) { e.preventDefault(); apply(); }
+            });
         })();
     </script>
 </body>
