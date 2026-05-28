@@ -1539,7 +1539,7 @@ footer.tiny {
 
 /* HDD-platter — sett rett ovenfra (top-down) */
 .platter-stack {
-    flex: 1;
+    flex: 0 0 auto;
     border-radius: 50%;
     margin: 14px auto;
     width: 220px;

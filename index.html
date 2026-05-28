@@ -61,8 +61,57 @@
         }
         .component { z-index: 2; }
 
+        /* ============ 3D-tilt på hovedkortet ============ */
+        .computer {
+            perspective: 1400px;
+            perspective-origin: 50% 30%;
+        }
+        .motherboard {
+            transform-style: preserve-3d;
+            transform:
+                rotateX(calc(18deg + var(--tilt-x, 0deg)))
+                rotateZ(calc(-3deg + var(--tilt-z, 0deg)));
+            transition: transform 0.25s ease-out;
+            will-change: transform;
+        }
+        .motherboard::before,
+        .motherboard::after,
+        .wires { transform: translateZ(0.1px); }
+
+        /* Hver komponent løftes opp fra PCB-en med en synlig "side" */
+        .component {
+            transform-style: preserve-3d;
+            transform: translateZ(28px);
+            transition: transform 0.18s ease, filter 0.18s ease;
+        }
+        /* Falsk side-vegg: mørk skygge ned mot PCB */
+        .component::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 8px;
+            box-shadow:
+                0 6px 0 rgba(0,0,0,0.55),
+                0 14px 22px rgba(0,0,0,0.5);
+            transform: translateZ(-14px);
+            pointer-events: none;
+            z-index: -1;
+        }
+        .component:hover {
+            transform: translateZ(48px) scale(1.03);
+            filter: brightness(1.18) drop-shadow(0 10px 14px rgba(0,0,0,0.5));
+            z-index: 10;
+        }
+
         @media (max-width: 720px) {
             .wires { display: none; }
+            /* Slå av tilt på mobil — flatt og klikkbart */
+            .motherboard { transform: none; }
+            .component { transform: none; }
+            .component::after { display: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .motherboard { transition: none; }
         }
 
         .startup-overlay {
@@ -357,6 +406,40 @@
             }
         }
         welcome();
+
+        // ============ Musefølgende 3D-tilt på hovedkortet ============
+        (function () {
+            if (window.matchMedia('(max-width: 720px)').matches) return;
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            const board = document.querySelector('.motherboard');
+            const stage = document.querySelector('.hub-stage');
+            if (!board || !stage) return;
+
+            const MAX_X = 7;
+            const MAX_Z = 9;
+            let raf = 0;
+
+            function onMove(e) {
+                if (raf) return;
+                raf = requestAnimationFrame(() => {
+                    raf = 0;
+                    const r = stage.getBoundingClientRect();
+                    const cx = e.clientX - r.left - r.width / 2;
+                    const cy = e.clientY - r.top - r.height / 2;
+                    const nx = Math.max(-1, Math.min(1, cx / (r.width / 2)));
+                    const ny = Math.max(-1, Math.min(1, cy / (r.height / 2)));
+                    board.style.setProperty('--tilt-x', (-ny * MAX_X) + 'deg');
+                    board.style.setProperty('--tilt-z', (nx * MAX_Z) + 'deg');
+                });
+            }
+            function onLeave() {
+                board.style.setProperty('--tilt-x', '0deg');
+                board.style.setProperty('--tilt-z', '0deg');
+            }
+
+            window.addEventListener('mousemove', onMove, { passive: true });
+            stage.addEventListener('mouseleave', onLeave);
+        })();
     </script>
 </body>
 </html>
