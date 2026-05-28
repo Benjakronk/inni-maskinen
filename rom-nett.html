@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nettverkskortet</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>📡 Nettverkskortet</h1>
+            <p>Sånn snakker datamaskiner sammen. <strong>Forespørsel</strong> ut, <strong>svar</strong> tilbake.</p>
+        </div>
+
+        <div class="chamber">
+            <div class="net-stage-v2">
+                <div class="pc-tower me">
+                    <div class="monitor"><span>$ ping<span class="blink"></span></span></div>
+                    <div class="stand"></div>
+                    <div class="ip-tag">192.168.1.5</div>
+                </div>
+                <div class="router-box">
+                    <div class="lbl-r">ROUTER</div>
+                    <div class="leds">
+                        <div class="led"></div><div class="led"></div><div class="led"></div>
+                    </div>
+                </div>
+                <div class="pc-tower them">
+                    <div class="monitor" id="server-mon"><span>SERVER OK<span class="blink"></span></span></div>
+                    <div class="stand"></div>
+                    <div class="ip-tag">192.168.1.42</div>
+                </div>
+
+                <div class="envelope-zone" id="env-zone"></div>
+            </div>
+
+            <div class="controls">
+                <label>
+                    Spør:
+                    <select id="endpoint" style="background: var(--bg-deep); color: var(--ink); border: 1px solid var(--bg-soft); padding: 6px; border-radius: 6px; font-family: monospace;">
+                        <option value="hilsen">/hilsen</option>
+                        <option value="dato">/dato</option>
+                        <option value="vits">/vits</option>
+                        <option value="tilfeldig">/tilfeldig</option>
+                        <option value="ekko">/ekko?tekst=hei</option>
+                        <option value="finnesikke">/finnesikke (404)</option>
+                    </select>
+                </label>
+                <button class="btn pink" onclick="sendRequest()">Send 📤</button>
+            </div>
+
+            <h3 style="color: var(--neon-amber); text-align:center; margin: 18px 0 8px;">📜 Samtale-logg</h3>
+            <div class="printer-tape" id="convo">
+                <div class="line-t" style="color:#888; font-style:italic;">Ingen forespørsler ennå …</div>
+            </div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Hvordan finner pakkene fram?</summary>
+            <div class="info-body">
+                <p>Hver datamaskin har en <strong>IP-adresse</strong>. Når du går til <code>vg.no</code>, slår nettleseren først opp IP-en hos en DNS-server, deretter sender den selve forespørselen.</p>
+                <p>Pakker hopper gjennom mange routere på veien — som forteller hverandre <em>«send dette nordover»</em> til de finner riktig server.</p>
+                <p>Det vi sender er en <strong>HTTP-forespørsel</strong>.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        let inFlight = false, sentCount = 0;
+
+        function logMsg(side, text) {
+            const c = document.getElementById('convo');
+            if (c.querySelector('[style*="italic"]')) c.innerHTML = '';
+            const m = document.createElement('div');
+            m.className = 'line-t ' + (side === 'req' ? 'cpu' : 'ram');
+            m.textContent = (side === 'req' ? '→ ' : '← ') + text;
+            c.appendChild(m);
+            c.scrollTop = c.scrollHeight;
+        }
+
+        const VITSER = [
+            'Hvorfor er datamaskiner aldri sultne? — De har alltid bytes!',
+            'Hvor mange programmerere trengs for å skifte en lyspære? Ingen, det er et hardware-problem.',
+            '0 og 1 går inn på en bar. 0 sier: "Hva gjør vi her?" 1 sier: "Vi opererer."'
+        ];
+
+        function endpointInfo(ep) {
+            switch (ep) {
+                case 'hilsen':     return { label: 'GET /hilsen',   reply: 'Hei fra serveren!' };
+                case 'dato':       return { label: 'GET /dato',     reply: new Date().toISOString().slice(0,19).replace('T',' ') };
+                case 'vits':       return { label: 'GET /vits',     reply: VITSER[Math.floor(Math.random()*VITSER.length)] };
+                case 'tilfeldig':  return { label: 'GET /tilfeldig',reply: String(Math.floor(Math.random()*100)) };
+                case 'ekko':       return { label: 'GET /ekko',     reply: 'hei' };
+                case 'finnesikke': return { label: 'GET /finnesikke', reply: '404 Not Found', err: true };
+            }
+        }
+
+        const delay = ms => new Promise(r => setTimeout(r, ms));
+
+        async function sendRequest() {
+            if (inFlight) return;
+            inFlight = true;
+            const ep = document.getElementById('endpoint').value;
+            const info = endpointInfo(ep);
+
+            const zone = document.getElementById('env-zone');
+            const env = document.createElement('div');
+            env.className = 'envelope-v2 req';
+            env.textContent = info.label;
+            env.style.left = '5%';
+            env.style.top = '10px';
+            zone.appendChild(env);
+
+            logMsg('req', info.label);
+
+            await new Promise(r => requestAnimationFrame(r));
+            env.style.left = '85%';
+
+            await delay(1700);
+
+            env.classList.remove('req');
+            env.classList.add(info.err ? 'err' : 'res');
+            env.textContent = info.reply.length > 40 ? info.reply.slice(0, 40) + '…' : info.reply;
+            env.style.top = '50px';
+
+            await delay(200);
+            env.style.left = '5%';
+            await delay(1700);
+
+            env.remove();
+            logMsg('res', info.reply);
+            sentCount++;
+            inFlight = false;
+
+            if (sentCount >= 3 && !Progress.has('nett')) {
+                if (Progress.give('nett', 0)) {
+                    Bitty.say(
+                        `<strong>Tre forespørsler!</strong> ⭐ Akkurat slik laster nettleseren din enhver side — bare gangen tusen.`,
+                        { actions: [{ label: 'Tilbake til hubben', callback: () => location.href = 'index.html' }] }
+                    );
+                }
+            }
+        }
+
+        setTimeout(() => {
+            Bitty.say(
+                `Velkommen til nettverkskortet! Velg et endepunkt og trykk Send. Pakken reiser via routeren til serveren — og kommer tilbake med svar.`,
+                { actions: [
+                    { label: 'Send /vits', callback: () => { document.getElementById('endpoint').value = 'vits'; sendRequest(); } },
+                    { label: 'Send /finnesikke', callback: () => { document.getElementById('endpoint').value = 'finnesikke'; sendRequest(); } }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>

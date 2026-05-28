@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inni Maskinen</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Plassering av komponentene på hovedkortet (12 kol × 8 rad) */
+        .c-cpu  { grid-column: 5 / 9;  grid-row: 2 / 4; }
+        .c-ram  { grid-column: 9 / 13; grid-row: 1 / 3; }
+        .c-bits { grid-column: 1 / 4;  grid-row: 1 / 3; }
+        .c-bus  { grid-column: 4 / 10; grid-row: 4 / 5; }
+        .c-disk { grid-column: 1 / 4;  grid-row: 6 / 9; }
+        .c-gpu  { grid-column: 5 / 9;  grid-row: 5 / 7; }
+        .c-net  { grid-column: 9 / 13; grid-row: 5 / 7; }
+        .c-os   { grid-column: 4 / 9;  grid-row: 7 / 9; }
+        .c-kode { grid-column: 9 / 13; grid-row: 7 / 9; }
+        .c-komp { grid-column: 1 / 4;  grid-row: 4 / 6; }
+
+        /* Ledninger mellom komponentene — isolerte fargede kabler */
+        .wires {
+            position: absolute;
+            inset: 22px;
+            width: calc(100% - 44px);
+            height: calc(100% - 44px);
+            z-index: 1;
+            pointer-events: none;
+            overflow: visible;
+        }
+        /* Mørk kant rundt kabelen (jakke / skygge) */
+        .wires .cable-outer {
+            fill: none;
+            stroke-width: 2.4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            opacity: 0.95;
+        }
+        /* Kabelens hovedfarge (isolasjon) */
+        .wires .cable-inner {
+            fill: none;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        /* Tynn lyslinje på toppen — sylinder-følelse */
+        .wires .cable-shine {
+            fill: none;
+            stroke: rgba(255,255,255,0.28);
+            stroke-width: 0.35;
+            stroke-linecap: round;
+        }
+        /* Loddepunkter / skrupinner */
+        .wires .pad {
+            fill: #d4a040;
+            stroke: rgba(0,0,0,0.7);
+            stroke-width: 0.2;
+        }
+        .wires .pad-inner {
+            fill: rgba(0,0,0,0.55);
+        }
+        .component { z-index: 2; }
+
+        @media (max-width: 720px) {
+            .wires { display: none; }
+        }
+
+        .startup-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-deep);
+            z-index: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 30px;
+            transition: opacity 0.6s, visibility 0.6s;
+        }
+        .startup-overlay.hidden { opacity: 0; visibility: hidden; }
+        .startup-overlay h1 {
+            font-size: clamp(2em, 6vw, 4em);
+            color: var(--neon-cyan);
+            text-shadow: 0 0 30px rgba(75,225,255,0.6);
+        }
+        .startup-overlay p { color: var(--ink-soft); max-width: 500px; text-align: center; }
+        .reset-btn {
+            position: fixed; bottom: 14px; right: 14px;
+            background: rgba(255,92,92,0.2);
+            color: var(--neon-red);
+            border: 1px solid var(--neon-red);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.75em;
+            cursor: pointer;
+            opacity: 0.4;
+            z-index: 90;
+        }
+        .reset-btn:hover { opacity: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="startup-overlay" id="startup">
+        <h1>⚡ Inni Maskinen</h1>
+        <p>Krymp deg ned og bli med Bitty på en tur inni en datamaskin. Klikk på det du vil utforske.</p>
+        <button class="btn pink" onclick="document.getElementById('startup').classList.add('hidden');sessionStorage.setItem('im_seen_startup','1')">Krymp meg!</button>
+    </div>
+    <script>
+        if (sessionStorage.getItem('im_seen_startup')) {
+            document.getElementById('startup').classList.add('hidden');
+        }
+    </script>
+
+    <div class="scene">
+        <div class="hub-stage">
+            <div class="scene-title">
+                <h1>⚡ Inni Maskinen</h1>
+                <p>Klikk på en del av maskinen for å utforske den.</p>
+                <div class="hub-progress" id="hub-progress"></div>
+            </div>
+
+            <div class="computer">
+                <div class="motherboard">
+
+                    <svg class="wires" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                        <defs>
+                            <!-- Kabelbaner: myke buer fra CPU til hver komponent -->
+                            <path id="w-ram"  d="M 53,23 C 65,18 76,14 82,13"/>
+                            <path id="w-bits" d="M 47,23 C 35,18 22,14 13,13"/>
+                            <path id="w-komp" d="M 46,29 C 32,38 20,46 13.5,49"/>
+                            <path id="w-bus"  d="M 50,30 C 50,36 50,40 50,43.5"/>
+                            <path id="w-gpu"  d="M 50,30 C 51,45 51,55 50,62"/>
+                            <path id="w-net"  d="M 54,29 C 70,38 80,52 83,61.5"/>
+                            <path id="w-disk" d="M 47,30 C 30,42 18,62 13,80"/>
+                            <path id="w-os"   d="M 49,30 C 47,55 46,75 45.83,86.5"/>
+                            <path id="w-kode" d="M 47,87.5 C 60,87 72,87.5 82,87.5"/>
+                        </defs>
+
+                        <!-- Hver kabel = mørk jakke + farget kjerne + lyslinje -->
+                        <use href="#w-ram"  class="cable-outer" style="stroke:#3a0a0a"/>
+                        <use href="#w-ram"  class="cable-inner" style="stroke:#c93838"/>
+                        <use href="#w-ram"  class="cable-shine"/>
+
+                        <use href="#w-bits" class="cable-outer" style="stroke:#3a1f08"/>
+                        <use href="#w-bits" class="cable-inner" style="stroke:#dc8230"/>
+                        <use href="#w-bits" class="cable-shine"/>
+
+                        <use href="#w-komp" class="cable-outer" style="stroke:#0a3a18"/>
+                        <use href="#w-komp" class="cable-inner" style="stroke:#3aa848"/>
+                        <use href="#w-komp" class="cable-shine"/>
+
+                        <use href="#w-bus"  class="cable-outer" style="stroke:#3a2a0a"/>
+                        <use href="#w-bus"  class="cable-inner" style="stroke:#e6c142"/>
+                        <use href="#w-bus"  class="cable-shine"/>
+
+                        <use href="#w-gpu"  class="cable-outer" style="stroke:#0a1838"/>
+                        <use href="#w-gpu"  class="cable-inner" style="stroke:#3a78d4"/>
+                        <use href="#w-gpu"  class="cable-shine"/>
+
+                        <use href="#w-net"  class="cable-outer" style="stroke:#2a2a2a"/>
+                        <use href="#w-net"  class="cable-inner" style="stroke:#dcdcdc"/>
+                        <use href="#w-net"  class="cable-shine"/>
+
+                        <use href="#w-disk" class="cable-outer" style="stroke:#000000"/>
+                        <use href="#w-disk" class="cable-inner" style="stroke:#1a1a1a"/>
+
+                        <use href="#w-os"   class="cable-outer" style="stroke:#2a0e3a"/>
+                        <use href="#w-os"   class="cable-inner" style="stroke:#8a4ed4"/>
+                        <use href="#w-os"   class="cable-shine"/>
+
+                        <use href="#w-kode" class="cable-outer" style="stroke:#3a0a18"/>
+                        <use href="#w-kode" class="cable-inner" style="stroke:#b04060"/>
+                        <use href="#w-kode" class="cable-shine"/>
+
+                        <!-- Loddepunkter ved hver komponent -->
+                        <g>
+                            <circle class="pad" cx="12.5"  cy="12.5"  r="1.1"/><circle class="pad-inner" cx="12.5"  cy="12.5"  r="0.45"/>
+                            <circle class="pad" cx="83.33" cy="12.5"  r="1.1"/><circle class="pad-inner" cx="83.33" cy="12.5"  r="0.45"/>
+                            <circle class="pad" cx="50"    cy="25"    r="1.2"/><circle class="pad-inner" cx="50"    cy="25"    r="0.5"/>
+                            <circle class="pad" cx="12.5"  cy="50"    r="1.1"/><circle class="pad-inner" cx="12.5"  cy="50"    r="0.45"/>
+                            <circle class="pad" cx="50"    cy="43.75" r="1.1"/><circle class="pad-inner" cx="50"    cy="43.75" r="0.45"/>
+                            <circle class="pad" cx="50"    cy="62.5"  r="1.1"/><circle class="pad-inner" cx="50"    cy="62.5"  r="0.45"/>
+                            <circle class="pad" cx="83.33" cy="62.5"  r="1.1"/><circle class="pad-inner" cx="83.33" cy="62.5"  r="0.45"/>
+                            <circle class="pad" cx="12.5"  cy="81.25" r="1.1"/><circle class="pad-inner" cx="12.5"  cy="81.25" r="0.45"/>
+                            <circle class="pad" cx="45.83" cy="87.5"  r="1.1"/><circle class="pad-inner" cx="45.83" cy="87.5"  r="0.45"/>
+                            <circle class="pad" cx="83.33" cy="87.5"  r="1.1"/><circle class="pad-inner" cx="83.33" cy="87.5"  r="0.45"/>
+                        </g>
+                    </svg>
+
+                    <a href="rom-bits.html" class="component c-bits" title="0/1-fabrikken">
+                        <div class="num">1</div>
+                        <div class="hw-bits">
+                            <div class="label"><div class="big">01</div><div class="small">LOGIC</div></div>
+                        </div>
+                        <div class="silk">0/1-fabrikken</div>
+                        <span class="name">0/1-fabrikken</span>
+                        <div class="stars" data-room="bits"></div>
+                    </a>
+
+                    <a href="rom-cpu.html" class="component c-cpu" title="CPU-mølla">
+                        <div class="num">4</div>
+                        <div class="hw-cpu">
+                            <div class="ihs">CPU</div>
+                        </div>
+                        <div class="silk">CPU-mølla</div>
+                        <span class="name">CPU-mølla</span>
+                        <div class="stars" data-room="cpu"></div>
+                    </a>
+
+                    <a href="rom-ram.html" class="component c-ram" title="RAM-biblioteket">
+                        <div class="num">2</div>
+                        <div class="hw-ram">
+                            <div class="stick">
+                                <div class="chip"></div><div class="chip"></div><div class="chip"></div>
+                                <div class="chip"></div><div class="chip"></div><div class="chip"></div>
+                                <div class="chip"></div><div class="chip"></div>
+                            </div>
+                            <div class="stick">
+                                <div class="chip"></div><div class="chip"></div><div class="chip"></div>
+                                <div class="chip"></div><div class="chip"></div><div class="chip"></div>
+                                <div class="chip"></div><div class="chip"></div>
+                            </div>
+                        </div>
+                        <div class="silk">RAM-biblioteket</div>
+                        <span class="name">RAM-biblioteket</span>
+                        <div class="stars" data-room="ram"></div>
+                    </a>
+
+                    <a href="rom-buss.html" class="component c-bus" title="Buss-motorveien">
+                        <div class="num">5</div>
+                        <div class="hw-bus"></div>
+                        <div class="silk">Buss-motorveien</div>
+                        <span class="name">Buss-motorveien</span>
+                        <div class="stars" data-room="buss"></div>
+                    </a>
+
+                    <a href="rom-disk.html" class="component c-disk" title="Disk-arkivet">
+                        <div class="num">3</div>
+                        <div class="hw-disk">
+                            <div class="chip-row">
+                                <div class="chip"></div><div class="chip"></div>
+                                <div class="chip"></div><div class="chip"></div>
+                            </div>
+                        </div>
+                        <div class="silk">Disk-arkivet</div>
+                        <span class="name">Disk-arkivet</span>
+                        <div class="stars" data-room="disk"></div>
+                    </a>
+
+                    <a href="rom-komp.html" class="component c-komp" title="Kompilator-verkstedet">
+                        <div class="num">10</div>
+                        <div class="hw-komp">
+                            <div class="src">print('hei')</div>
+                            <div class="arrow">↓</div>
+                            <div class="out">01001…</div>
+                        </div>
+                        <div class="silk">Kompilator</div>
+                        <span class="name">Kompilator-verkstedet</span>
+                        <div class="stars" data-room="komp"></div>
+                    </a>
+
+                    <a href="rom-gpu.html" class="component c-gpu" title="Skjermkortet">
+                        <div class="num">6</div>
+                        <div class="hw-gpu">
+                            <div class="fan"></div>
+                            <div class="fan"></div>
+                        </div>
+                        <div class="silk">Skjermkortet (GPU)</div>
+                        <span class="name">Skjermkortet</span>
+                        <div class="stars" data-room="gpu"></div>
+                    </a>
+
+                    <a href="rom-nett.html" class="component c-net" title="Nettverkskortet">
+                        <div class="num">7</div>
+                        <div class="hw-net">
+                            <div class="rj45"></div>
+                        </div>
+                        <div class="silk">Nettverkskort</div>
+                        <span class="name">Nettverkskortet</span>
+                        <div class="stars" data-room="nett"></div>
+                    </a>
+
+                    <a href="rom-os.html" class="component c-os" title="OS-tårnet">
+                        <div class="num">8</div>
+                        <div class="hw-os">
+                            <div class="chip">OS<br>BOOT</div>
+                        </div>
+                        <div class="silk">OS-tårnet</div>
+                        <span class="name">OS-tårnet</span>
+                        <div class="stars" data-room="os"></div>
+                    </a>
+
+                    <a href="rom-kode.html" class="component c-kode" title="Koderommet">
+                        <div class="num">9</div>
+                        <div class="hw-kode">
+                            <div class="body">CODE</div>
+                            <div class="connector"></div>
+                        </div>
+                        <div class="silk">Koderommet</div>
+                        <span class="name">Koderommet</span>
+                        <div class="stars" data-room="kode"></div>
+                    </a>
+
+                </div>
+            </div>
+
+            <footer class="tiny">Krymp · Klikk · Lær · © 2026</footer>
+        </div>
+    </div>
+
+    <button class="reset-btn" onclick="if(confirm('Nullstille alle stjerner?')){Progress.reset();location.reload();}">Nullstill</button>
+
+    <div class="bitty-bar">
+        <div class="bitty">
+            <div class="bitty-mouth"></div>
+            <div class="bitty-label">Bitty</div>
+        </div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        // Tegn stjerner pr. komponent + total
+        document.querySelectorAll('.stars[data-room]').forEach(el => {
+            el.innerHTML = Progress.renderStars(el.dataset.room);
+        });
+        const total = Progress.total();
+        document.getElementById('hub-progress').innerHTML =
+            `<span class="star">★</span> ${total.earned} / ${total.total} stjerner samlet`;
+
+        // Bittys velkomst — tilpass etter hvor mange stjerner
+        function welcome() {
+            if (total.earned === 0) {
+                Bitty.say(
+                    `Hei! Jeg er <strong>Bitty</strong>. Jeg er en levende bit — jeg kan være <code>0</code> eller <code>1</code>. ` +
+                    `Velkommen inni maskinen! Vil du starte med <strong>0/1-fabrikken</strong>? Eller utforsk fritt — du kan gå hvor du vil.`,
+                    {
+                        actions: [
+                            { label: 'Til 0/1-fabrikken', callback: () => location.href = 'rom-bits.html' },
+                            { label: 'Jeg utforsker selv', muted: true, callback: () => Bitty.say('Bra! Klikk en del av maskinen når du er klar.') }
+                        ]
+                    }
+                );
+            } else if (total.earned < total.total) {
+                Bitty.say(
+                    `Velkommen tilbake! Du har <strong>${total.earned} / ${total.total}</strong> stjerner. Klikk en del du ikke har vært i ennå, eller besøk noe på nytt.`
+                );
+            } else {
+                Bitty.say(
+                    `Du har <strong>alle ${total.total} stjernene</strong>! ⭐ Du har sett hver del av maskinen. Imponerende. Klikk gjerne et rom igjen — det er ting å oppdage.`
+                );
+            }
+        }
+        welcome();
+    </script>
+</body>
+</html>

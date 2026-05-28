@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buss-motorveien</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>🛣️ Buss-motorveien</h1>
+            <p>Den eneste veien data har mellom CPU og RAM. Bare én bil om gangen.</p>
+        </div>
+
+        <div class="chamber">
+            <div class="highway">
+                <div class="highway-roof"></div>
+                <div class="lanes">
+                    <div class="endpoint-bldg cpu">
+                        <div class="icon-l">🧠</div>
+                        <div class="lbl">CPU</div>
+                        <div class="ip-l">PROC-1</div>
+                    </div>
+                    <div class="lanes-road" id="road"></div>
+                    <div class="endpoint-bldg ram">
+                        <div class="icon-l">📚</div>
+                        <div class="lbl">RAM</div>
+                        <div class="ip-l">MEM-0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-strip">
+                <div class="pill">⏱ Tur-retur: <span class="v" id="latency">—</span> ms</div>
+                <div class="pill">📦 Sendt: <span class="v" id="count">0</span></div>
+            </div>
+
+            <div class="controls">
+                <button class="btn pink" onclick="sendOp('write', 0, 'X')">Skriv X → [0]</button>
+                <button class="btn amber" onclick="sendOp('read', 0)">Les [0]</button>
+                <button class="btn outline" onclick="randomOp()">Tilfeldig</button>
+                <button class="btn green" onclick="sendBurst()">10 pakker</button>
+            </div>
+
+            <h3 style="color: var(--neon-amber); text-align:center; margin: 20px 0 8px;">RAM-celler</h3>
+            <div class="ram-cells" id="ramStore"></div>
+
+            <h3 style="color: var(--neon-cyan); text-align:center; margin: 18px 0 8px;">📜 Trafikk-logg</h3>
+            <div class="printer-tape" id="log"></div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Hvorfor en buss?</summary>
+            <div class="info-body">
+                <p>CPU og RAM er fysisk separate brikker. De må snakke over <strong>ledninger</strong> — bussen. Hver pakke tar tid å sende.</p>
+                <p>Bussen er som regel den tregeste delen. Derfor har moderne CPU-er <strong>cache</strong> — bittebitte intern RAM, enda nærmere kjernen.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        const ram = Array(8).fill(null);
+        let busBusy = false;
+        let count = 0;
+        const queue = [];
+
+        function buildRam() {
+            const el = document.getElementById('ramStore');
+            el.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                const c = document.createElement('div');
+                c.className = 'cell-r';
+                c.innerHTML = `<div class="a-l">[${i}]</div><div class="v-l">${ram[i] ?? '—'}</div>`;
+                el.appendChild(c);
+            }
+        }
+
+        function log(side, msg) {
+            const l = document.getElementById('log');
+            const line = document.createElement('div');
+            line.className = 'line-t ' + side;
+            line.textContent = msg;
+            l.appendChild(line);
+            l.scrollTop = l.scrollHeight;
+        }
+
+        function sendOp(kind, addr, val) {
+            if (busBusy) {
+                queue.push({ kind, addr, val });
+                log('bus', `(kø) ${kind.toUpperCase()} venter på bussen …`);
+                return;
+            }
+            busBusy = true;
+            const start = performance.now();
+            const road = document.getElementById('road');
+            const car = document.createElement('div');
+            car.className = 'car ' + kind + ' lane-top';
+            car.style.left = '0px';
+            car.textContent = kind === 'write' ? `WR [${addr}]=${val}` : `RD [${addr}]`;
+            road.appendChild(car);
+
+            log('cpu', kind === 'write' ? `→ Skriv ${val} til [${addr}]` : `→ Les [${addr}]`);
+
+            requestAnimationFrame(() => {
+                car.style.left = (road.clientWidth - 90) + 'px';
+            });
+
+            setTimeout(() => {
+                let returnPayload;
+                if (kind === 'write') {
+                    ram[addr] = val;
+                    log('ram', `← OK, lagret ${val} på [${addr}]`);
+                    returnPayload = 'OK';
+                } else {
+                    returnPayload = ram[addr] ?? '∅';
+                    log('ram', `← Verdi på [${addr}] er ${returnPayload}`);
+                }
+                buildRam();
+                car.textContent = '← ' + returnPayload;
+                car.classList.remove('lane-top');
+                car.classList.add('lane-bottom');
+
+                setTimeout(() => {
+                    car.style.left = '0px';
+                    setTimeout(() => {
+                        car.remove();
+                        busBusy = false;
+                        const elapsed = Math.round(performance.now() - start);
+                        document.getElementById('latency').textContent = elapsed;
+                        count++;
+                        document.getElementById('count').textContent = count;
+                        if (queue.length > 0) {
+                            const next = queue.shift();
+                            sendOp(next.kind, next.addr, next.val);
+                        }
+                        if (count >= 5 && !Progress.has('buss')) winChallenge();
+                    }, 1450);
+                }, 250);
+            }, 1450);
+        }
+
+        function randomOp() {
+            const addr = Math.floor(Math.random() * 8);
+            if (Math.random() > 0.5) sendOp('write', addr, Math.floor(Math.random() * 100));
+            else sendOp('read', addr);
+        }
+
+        function sendBurst() {
+            for (let i = 0; i < 10; i++) {
+                const addr = i % 8;
+                if (i % 2 === 0) sendOp('write', addr, Math.floor(Math.random() * 100));
+                else sendOp('read', addr);
+            }
+        }
+
+        function winChallenge() {
+            if (Progress.give('buss', 0)) {
+                Bitty.say(
+                    `<strong>5 pakker ferdig!</strong> ⭐ Du så hvor lang tid hver tur tar — og hvordan biler stiller seg i kø.`,
+                    { actions: [{ label: 'Tilbake til hubben', callback: () => location.href = 'index.html' }] }
+                );
+            }
+        }
+
+        buildRam();
+
+        setTimeout(() => {
+            Bitty.say(
+                `Velkommen på motorveien! Hver bil bærer én operasjon. Trykk en knapp og se den krysse veien.`,
+                { actions: [
+                    { label: 'Send 10 etter hverandre', callback: sendBurst },
+                    { label: 'Jeg sender selv', muted: true, callback: () => Bitty.say('Prøv «Tilfeldig» — pakker som kommer mens veien er opptatt må vente.') }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>

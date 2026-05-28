@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Skjermkortet</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .pixel { width: 38px; height: 38px; cursor: pointer; }
+        .pixel:hover { outline: 2px solid white; outline-offset: -2px; }
+        .pixel-grid { background: #050505; padding: 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>🎨 Skjermkortet</h1>
+            <p>Skjermen er et rutenett av <strong>piksler</strong>. Hver piksel er tre tall: <span style="color:#ff5c5c;">R</span>, <span style="color:var(--neon-green);">G</span>, <span style="color:var(--neon-cyan);">B</span>.</p>
+        </div>
+
+        <div class="chamber">
+            <div class="crt-monitor">
+                <div class="crt-screen">
+                    <div class="pixel-grid" id="grid" style="grid-template-columns: repeat(8, 1fr);"></div>
+                </div>
+                <div class="crt-controls">
+                    <div class="knob-row">
+                        <div class="knob" title="Bryter"></div>
+                        <div class="knob" title="Volum"></div>
+                    </div>
+                    <div class="color-knobs" id="palette"></div>
+                </div>
+            </div>
+
+            <div class="status-strip">
+                <div class="pill"><span style="color:#ff5c5c;">R</span> <span class="v" id="r-val">0</span></div>
+                <div class="pill"><span style="color:var(--neon-green);">G</span> <span class="v" id="g-val">0</span></div>
+                <div class="pill"><span style="color:var(--neon-cyan);">B</span> <span class="v" id="b-val">0</span></div>
+                <div class="pill">HEX <span class="v" id="hex-val">#000000</span></div>
+            </div>
+
+            <div class="controls">
+                <button class="btn outline" onclick="clearGrid()">Tøm</button>
+                <button class="btn pink" onclick="randomGrid()">Tilfeldig</button>
+                <button class="btn green" onclick="loadTemplate('smiley')">🙂 Smiley</button>
+                <button class="btn green" onclick="loadTemplate('hjerte')">❤️ Hjerte</button>
+                <button class="btn green" onclick="loadTemplate('regnbue')">🌈 Regnbue</button>
+                <button class="btn green" onclick="loadTemplate('hus')">🏠 Hus</button>
+            </div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Hva er en piksel egentlig?</summary>
+            <div class="info-body">
+                <p>En piksel er <strong>3 tall</strong> — hver mellom 0 og 255. 8 + 8 + 8 = <strong>24 bits</strong> per piksel.</p>
+                <p>En vanlig skjerm har millioner av piksler. GPU-en regner ut alle 60 ganger i sekundet — mens du spiller, skroller, ser video.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        const SIZE = 8;
+        let grid = Array(SIZE * SIZE).fill('#111111');
+        let activeColor = '#ff5c5c';
+
+        const PALETTE = ['#ff5c5c','#ffcc44','#6cff8c','#4be1ff','#5c7cff','#ff5ccd','#ffffff','#888888','#000000','#a06030'];
+
+        function buildPalette() {
+            const el = document.getElementById('palette');
+            el.innerHTML = '';
+            PALETTE.forEach(c => {
+                const sw = document.createElement('div');
+                sw.className = 'color-knob' + (c === activeColor ? ' active' : '');
+                sw.style.background = c;
+                sw.addEventListener('click', () => {
+                    activeColor = c;
+                    [...el.children].forEach(x => x.classList.remove('active'));
+                    sw.classList.add('active');
+                    updateRGBReadout();
+                });
+                el.appendChild(sw);
+            });
+        }
+
+        function buildGrid() {
+            const el = document.getElementById('grid');
+            el.innerHTML = '';
+            for (let i = 0; i < SIZE * SIZE; i++) {
+                const px = document.createElement('div');
+                px.className = 'pixel';
+                px.style.background = grid[i];
+                px.addEventListener('click', () => {
+                    grid[i] = activeColor;
+                    px.style.background = activeColor;
+                    checkChallenges();
+                });
+                el.appendChild(px);
+            }
+        }
+
+        function updateRGBReadout() {
+            const c = activeColor.replace('#', '');
+            const r = parseInt(c.substring(0, 2), 16);
+            const g = parseInt(c.substring(2, 4), 16);
+            const b = parseInt(c.substring(4, 6), 16);
+            document.getElementById('r-val').textContent = r;
+            document.getElementById('g-val').textContent = g;
+            document.getElementById('b-val').textContent = b;
+            document.getElementById('hex-val').textContent = activeColor.toUpperCase();
+        }
+
+        function clearGrid() { grid = grid.map(_ => '#111111'); buildGrid(); }
+        function randomGrid() {
+            grid = grid.map(_ => PALETTE[Math.floor(Math.random() * PALETTE.length)]);
+            buildGrid(); checkChallenges();
+        }
+
+        const TEMPLATES = {
+            hjerte: ['..RR.RR.','.RRRRRRR','.RRRRRRR','..RRRRR.','...RRR..','....R...','........','........'],
+            smiley: ['..YYYY..','.YYYYYY.','YY.YY.YY','YYYYYYYY','YY.YY.YY','Y.YYYY.Y','.YYYYYY.','..YYYY..'],
+            regnbue:['RRRRRRRR','OOOOOOOO','YYYYYYYY','GGGGGGGG','BBBBBBBB','PPPPPPPP','........','........'],
+            hus:    ['...RR...','..RRRR..','.RRRRRR.','RRRRRRRR','YYYYYYYY','YYBBYYYY','YYBBYYYY','YYYYYYYY']
+        };
+        const COLORMAP = { R:'#ff5c5c', O:'#ff9933', Y:'#ffcc44', G:'#6cff8c', B:'#4be1ff', P:'#ff5ccd', '.':'#111111' };
+
+        function loadTemplate(name) {
+            const t = TEMPLATES[name];
+            if (!t) return;
+            grid = [];
+            t.forEach(row => row.split('').forEach(ch => grid.push(COLORMAP[ch] || '#111')));
+            buildGrid(); checkChallenges();
+        }
+
+        function countLitPixels() { return grid.filter(c => c !== '#111111').length; }
+        function checkChallenges() {
+            if (!Progress.has('gpu') && countLitPixels() >= 12) {
+                if (Progress.give('gpu', 0)) {
+                    Bitty.say(
+                        `<strong>Du tegner!</strong> ⭐ Hver klikk sender tre tall (R, G, B) til skjermkortet, som tegner pikselen.`,
+                        { actions: [
+                            { label: 'Tilbake til hubben', callback: () => location.href = 'index.html' },
+                            { label: 'Tegn ferdig', muted: true, callback: () => Bitty.say('Bruk en mal hvis du sliter med å lage noe ditt eget!') }
+                        ]}
+                    );
+                }
+            }
+        }
+
+        buildPalette(); buildGrid(); updateRGBReadout();
+
+        setTimeout(() => {
+            Bitty.say(
+                `Velkommen til den vintage CRT-skjermen! Klikk en farge på rattene, deretter en piksel. Stjerne når du har malt minst 12.`,
+                { actions: [
+                    { label: 'Vis en mal', callback: () => loadTemplate('smiley') },
+                    { label: 'Jeg tegner selv', muted: true, callback: () => Bitty.say('Tegn det du har lyst på!') }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>

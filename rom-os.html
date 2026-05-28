@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OS-tårnet</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>🪟 OS-tårnet</h1>
+            <p>Operativsystemet er <strong>sjefen</strong>. Dobbeltklikk en fil — OS-et velger riktig app.</p>
+        </div>
+
+        <div class="chamber">
+            <div class="desktop-frame">
+                <div class="desktop-area">
+                    <div class="files" id="files"></div>
+                </div>
+                <div class="taskbar-v2" id="taskbar">
+                    <div class="start-btn">⊞ SKAPET OS</div>
+                    <span class="clock" id="clock"></span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn outline" onclick="showTaskMgr()">📋 Oppgavebehandler</button>
+                <button class="btn pink" onclick="closeAll()">Lukk alle vinduer</button>
+            </div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Hva gjør OS-et egentlig?</summary>
+            <div class="info-body">
+                <ul style="margin-left: 20px; line-height: 1.7;">
+                    <li>Kobler en filtype (.txt, .jpg, .mp3) til riktig program.</li>
+                    <li>Gir hver prosess sin egen del av RAM.</li>
+                    <li>Bytter mellom prosesser hundrevis av ganger i sekundet.</li>
+                    <li>Snakker med tastatur, mus, skjerm, lyd — så programmene slipper.</li>
+                </ul>
+                <p>Windows, macOS, Linux, Android — alle er operativsystemer.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        const FILES = [
+            { name: 'stil.txt',     ico: '📄', type: 'tekst' },
+            { name: 'matte.docx',   ico: '📝', type: 'tekst' },
+            { name: 'bilde.jpg',    ico: '🖼️', type: 'bilde' },
+            { name: 'sang.mp3',     ico: '🎵', type: 'lyd' },
+            { name: 'video.mp4',    ico: '🎬', type: 'video' },
+            { name: 'kode.py',      ico: '🐍', type: 'kode' },
+            { name: 'skapet.db',    ico: '🗃️', type: 'db' },
+            { name: 'rar.exe',      ico: '⚙️', type: 'program' },
+        ];
+
+        const APPS_BY_TYPE = {
+            tekst:   { app: '📝 Notepad',         body: name => `Innhold av ${name}: «Hei dette er en tekstfil. Notepad åpnet meg fordi jeg er en .txt!»` },
+            bilde:   { app: '🖼️ Bildevisning',    body: name => `Viser ${name} (forestilt: et fint bilde av en katt 🐱).` },
+            lyd:     { app: '🎵 Musikk',          body: name => `▶ Spiller av ${name} … (tenk på din favorittlåt)` },
+            video:   { app: '🎬 Videospiller',    body: name => `Avspiller ${name} i 1080p.` },
+            kode:    { app: '🐍 Python',          body: name => `Kjører ${name} … utskrift: «Hei verden!»` },
+            db:      { app: '🗃️ Database-leser',  body: name => `Åpnet ${name}. Du ser tabellen <code>ting</code> med 4 rader.` },
+            program: { app: '⚙️ Installasjon',    body: name => `Installerer ${name}. Trenger administrator-tillatelse.` },
+        };
+
+        const baseProcesses = [
+            { name: 'system',   ram: 142, cpu: 2 },
+            { name: 'kernel',   ram: 88,  cpu: 1 },
+            { name: 'shell',    ram: 64,  cpu: 0 },
+            { name: 'os-tower', ram: 220, cpu: 5 },
+        ];
+        let openWindows = [];
+
+        function tick() {
+            const d = new Date();
+            document.getElementById('clock').textContent =
+                String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        }
+        setInterval(tick, 30000); tick();
+
+        function buildFiles() {
+            const el = document.getElementById('files');
+            el.innerHTML = '';
+            FILES.forEach(f => {
+                const d = document.createElement('div');
+                d.className = 'file-icon-v2';
+                d.innerHTML = `<div class="ico-v2">${f.ico}</div><div class="name-v2">${f.name}</div>`;
+                d.addEventListener('dblclick', () => openFile(f));
+                d.addEventListener('click', () => openFile(f));
+                el.appendChild(d);
+            });
+        }
+
+        let winCounter = 0;
+        function openFile(file) {
+            if (openWindows.find(w => w.fileName === file.name)) return;
+            const appInfo = APPS_BY_TYPE[file.type];
+            const id = ++winCounter;
+            const w = {
+                id, fileName: file.name, app: appInfo.app,
+                ram: 30 + Math.floor(Math.random() * 80),
+                cpu: 1 + Math.floor(Math.random() * 12)
+            };
+            openWindows.push(w);
+
+            const desk = document.querySelector('.desktop-area');
+            const win = document.createElement('div');
+            win.className = 'win-v2';
+            win.style.left = (40 + (id % 4) * 30) + 'px';
+            win.style.top  = (20 + (id % 4) * 30) + 'px';
+            win.dataset.id = id;
+            win.innerHTML = `
+                <div class="titlebar-v2">
+                    <span>${appInfo.app} — ${file.name}</span>
+                    <div class="close-v2">✕</div>
+                </div>
+                <div class="body-v2">${appInfo.body(file.name)}</div>
+            `;
+            win.querySelector('.close-v2').addEventListener('click', e => { e.stopPropagation(); closeWin(id); });
+            makeDraggable(win);
+            desk.appendChild(win);
+
+            const tb = document.getElementById('taskbar');
+            const tbBtn = document.createElement('div');
+            tbBtn.className = 'tb-app';
+            tbBtn.dataset.id = id;
+            tbBtn.textContent = appInfo.app;
+            tb.insertBefore(tbBtn, document.getElementById('clock'));
+
+            checkUnique();
+        }
+
+        function makeDraggable(win) {
+            const bar = win.querySelector('.titlebar-v2');
+            let dx = 0, dy = 0, dragging = false;
+            bar.addEventListener('mousedown', e => {
+                if (e.target.classList.contains('close-v2')) return;
+                dragging = true;
+                const r = win.getBoundingClientRect();
+                dx = e.clientX - r.left; dy = e.clientY - r.top;
+                e.preventDefault();
+            });
+            document.addEventListener('mousemove', e => {
+                if (!dragging) return;
+                const parent = win.parentElement.getBoundingClientRect();
+                win.style.left = Math.max(0, e.clientX - parent.left - dx) + 'px';
+                win.style.top  = Math.max(0, e.clientY - parent.top  - dy) + 'px';
+            });
+            document.addEventListener('mouseup', () => dragging = false);
+        }
+
+        function closeWin(id) {
+            openWindows = openWindows.filter(w => w.id !== id);
+            document.querySelector(`.win-v2[data-id="${id}"]`)?.remove();
+            document.querySelector(`.tb-app[data-id="${id}"]`)?.remove();
+        }
+
+        function closeAll() {
+            [...openWindows].forEach(w => closeWin(w.id));
+        }
+
+        function showTaskMgr() {
+            const fakeFile = { name: 'task-manager', type: 'program', ico: '📋' };
+            if (openWindows.find(w => w.fileName === 'task-manager')) return;
+            const id = ++winCounter;
+            const w = { id, fileName: 'task-manager', app: '📋 Oppgavebehandler', ram: 50, cpu: 1 };
+            openWindows.push(w);
+
+            const all = [...baseProcesses, ...openWindows.filter(x => x.id !== id).map(x => ({ name: x.app, ram: x.ram, cpu: x.cpu }))];
+            const rows = all.map(p => `<tr><td>${p.name}</td><td>${p.ram} MB</td><td>${p.cpu} %</td></tr>`).join('');
+
+            const desk = document.querySelector('.desktop-area');
+            const win = document.createElement('div');
+            win.className = 'win-v2';
+            win.style.left = '60px'; win.style.top = '50px';
+            win.style.minWidth = '320px';
+            win.dataset.id = id;
+            win.innerHTML = `
+                <div class="titlebar-v2">
+                    <span>📋 Oppgavebehandler</span>
+                    <div class="close-v2">✕</div>
+                </div>
+                <div class="body-v2" style="padding:0;">
+                    <table class="task-mgr-table">
+                        <thead><tr><th>Prosess</th><th>RAM</th><th>CPU</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+            win.querySelector('.close-v2').addEventListener('click', e => { e.stopPropagation(); closeWin(id); });
+            makeDraggable(win);
+            desk.appendChild(win);
+        }
+
+        const opened = new Set();
+        function checkUnique() {
+            openWindows.forEach(w => opened.add(w.app));
+            if (opened.size >= 3 && !Progress.has('os')) {
+                if (Progress.give('os', 0)) {
+                    Bitty.say(
+                        `<strong>Tre forskjellige programmer!</strong> ⭐ Hver gang slo OS-et opp filtypen, fant riktig app, og startet en ny prosess.`,
+                        { actions: [{ label: 'Tilbake til hubben', callback: () => location.href = 'index.html' }] }
+                    );
+                }
+            }
+        }
+
+        buildFiles();
+
+        setTimeout(() => {
+            Bitty.say(
+                `Skrivebord! Klikk en fil for å åpne den. Åpne 3 forskjellige filtyper for å få stjernen.`,
+                { actions: [
+                    { label: 'Åpne bilde.jpg for meg', callback: () => openFile(FILES.find(f => f.name === 'bilde.jpg')) },
+                    { label: 'Jeg klikker selv', muted: true, callback: () => Bitty.say('Prøv også Oppgavebehandler-knappen!') }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>

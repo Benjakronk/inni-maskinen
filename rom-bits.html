@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0/1-fabrikken</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>🔢 0/1-fabrikken</h1>
+            <p>Vipp på bryterne. Se tallet og bokstaven oppdatere seg på skjermene.</p>
+        </div>
+
+        <div class="chamber">
+            <div class="scene-stage">
+                <div class="dip-board" id="bit-row"></div>
+            </div>
+
+            <div class="status-strip">
+                <div class="seven-seg" id="decimal-out">0</div>
+            </div>
+
+            <div class="status-strip" style="margin-top: 16px;">
+                <div class="lcd">
+                    <div class="row-l"><span class="lbl">BIN</span><span class="val" id="binary-out">00000000</span></div>
+                    <div class="row-l"><span class="lbl">HEX</span><span class="val" id="hex-out">0x00</span></div>
+                    <div class="row-l"><span class="lbl">CHR</span><span class="val" id="ascii-out">·</span></div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn outline" onclick="setAll(false)">Alle av</button>
+                <button class="btn outline" onclick="setAll(true)">Alle på</button>
+                <button class="btn pink" onclick="randomize()">Tilfeldig</button>
+            </div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Hva skjer her?</summary>
+            <div class="info-body">
+                <p>Hver bryter er en <strong>bit</strong>. Hver bit har en verdi: høyre = 1, så 2, 4, 8, 16, 32, 64, 128.</p>
+                <p>Slå på de bitene du vil ha med, legg sammen verdiene = desimaltallet på den røde skjermen.</p>
+                <p>Hver byte (0–255) kan stå for ett tegn — det kalles <code>ASCII</code>. Slik lagrer maskinen tekst.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        const WEIGHTS = [128, 64, 32, 16, 8, 4, 2, 1];
+        let bits = [0,0,0,0,0,0,0,0];
+        const row = document.getElementById('bit-row');
+
+        function render() {
+            row.innerHTML = '';
+            bits.forEach((b, i) => {
+                const el = document.createElement('div');
+                el.className = 'toggle-bit' + (b ? ' on' : '');
+                el.innerHTML = `<div class="switch"></div><div class="digit">${b}</div><div class="weight">${WEIGHTS[i]}</div>`;
+                el.addEventListener('click', () => {
+                    bits[i] = b ? 0 : 1;
+                    render();
+                    updateReadout();
+                    checkChallenge();
+                });
+                row.appendChild(el);
+            });
+        }
+
+        function decimal() { return bits.reduce((s, b, i) => s + (b ? WEIGHTS[i] : 0), 0); }
+
+        function updateReadout() {
+            const dec = decimal();
+            document.getElementById('binary-out').textContent  = bits.join('');
+            document.getElementById('decimal-out').textContent = dec;
+            document.getElementById('hex-out').textContent     = '0x' + dec.toString(16).toUpperCase().padStart(2, '0');
+            const ch = (dec >= 32 && dec <= 126) ? String.fromCharCode(dec) : '·';
+            document.getElementById('ascii-out').textContent   = (dec === 32 ? '␠' : ch);
+        }
+
+        function setAll(on) { bits = bits.map(_ => on ? 1 : 0); render(); updateReadout(); checkChallenge(); }
+        function randomize() { bits = bits.map(_ => Math.random() > 0.5 ? 1 : 0); render(); updateReadout(); checkChallenge(); }
+
+        const target = 65;
+        let challengeReady = false;
+
+        function challenge() {
+            challengeReady = true;
+            Bitty.say(
+                `Klarer du å lage tallet <strong>65</strong>? Det er ASCII-koden for bokstaven <code>A</code>. ` +
+                `Tips: 64 + 1 = 65. Hvilke bits må stå på?`
+            );
+        }
+
+        function checkChallenge() {
+            if (!challengeReady) return;
+            const dec = decimal();
+            if (dec === target) {
+                challengeReady = false;
+                if (Progress.give('bits', 0)) {
+                    Bitty.say(
+                        `<strong>Strålende!</strong> Du har laget bokstaven <code>A</code> ut av åtte små brytere. Det er <em>akkurat slik</em> all tekst lagres i en datamaskin. ⭐`,
+                        { actions: [
+                            { label: 'Tilbake til hubben', callback: () => location.href = 'index.html' },
+                            { label: 'Lek videre her', muted: true, callback: () => Bitty.say('Prøv å lage tallet 72 (det blir <code>H</code>) eller 33 (<code>!</code>).') }
+                        ]}
+                    );
+                } else {
+                    Bitty.say('Du klarte det igjen! Prøv 72 = H, eller 33 = !');
+                }
+            }
+        }
+
+        render();
+        updateReadout();
+
+        setTimeout(() => {
+            Bitty.say(
+                `Velkommen til <strong>0/1-fabrikken</strong>! Vipp på en bryter — se tallet på den røde skjermen og bokstaven på den grønne.`,
+                { actions: [
+                    { label: 'Gi meg en oppgave', callback: challenge },
+                    { label: 'La meg leke selv', muted: true, callback: () => Bitty.say('Klikk «Tilfeldig» og se ASCII-tegnet endre seg!') }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>

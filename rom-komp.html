@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kompilator-verkstedet</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>🔧 Kompilator-verkstedet</h1>
+            <p>Datamaskinen forstår bare 0 og 1. Hvordan blir <code>print("hei")</code> til det?</p>
+        </div>
+
+        <div class="chamber">
+            <h3 style="color: var(--neon-cyan); margin-bottom:10px; text-align:center;">📜 Skriv en linje kode</h3>
+            <textarea id="src" class="compile-input">print("hei verden")</textarea>
+
+            <div class="preset-row">
+                <button class="preset-c" onclick="setSrc(&quot;print('hei')&quot;)">print('hei')</button>
+                <button class="preset-c" onclick="setSrc('x = 5 + 3')">x = 5 + 3</button>
+                <button class="preset-c" onclick="setSrc('print(2 * 21)')">print(2 * 21)</button>
+                <button class="preset-c" onclick="setSrc(&quot;navn = 'Anna'&quot;)">navn = 'Anna'</button>
+            </div>
+
+            <div class="controls">
+                <button class="btn pink" onclick="compile()">▶ Kompiler</button>
+            </div>
+
+            <div class="compiler-line" style="margin-top:18px;">
+                <div class="cmp-stations">
+                    <div class="cmp-station s1">
+                        <h4>1. TOKENISER</h4>
+                        <div class="out-c" id="out-tokens">—</div>
+                    </div>
+                    <div class="cmp-station s2">
+                        <h4>2. PARSE</h4>
+                        <div class="out-c" id="out-tree">—</div>
+                    </div>
+                    <div class="cmp-station s3">
+                        <h4>3. BYTECODE</h4>
+                        <div class="out-c" id="out-bytes">—</div>
+                    </div>
+                    <div class="cmp-station s4">
+                        <h4>4. KJØR</h4>
+                        <div class="out-c" id="out-run">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Lag på lag</summary>
+            <div class="info-body">
+                <ol style="margin-left: 20px; line-height: 1.7;">
+                    <li><strong>Tokenisering</strong> — koden deles i ord: <code>print</code>, <code>(</code>, <code>"hei"</code>, <code>)</code>.</li>
+                    <li><strong>Parsing</strong> — orden i ordene blir et tre.</li>
+                    <li><strong>Bytecode</strong> — treet blir til små maskinordrer.</li>
+                    <li><strong>Kjøring</strong> — tolken eller CPU-en utfører instruksjonene.</li>
+                </ol>
+                <p>Husk CPU-mølla? Bytecode-instruksjonene fra steg 3 er nettopp det <strong>tolken</strong> deler ut til CPU-en.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        function setSrc(s) { document.getElementById('src').value = s; }
+        let runs = 0;
+
+        function tokenize(src) {
+            const tokens = [];
+            const re = /\s*(?:(\d+)|('[^']*'|"[^"]*")|([a-zA-Z_][a-zA-Z0-9_]*)|([+\-*\/=])|([(),]))/g;
+            let m;
+            while ((m = re.exec(src)) !== null) {
+                if (m[1]) tokens.push({ kind: 'num', v: m[1] });
+                else if (m[2]) tokens.push({ kind: 'str', v: m[2] });
+                else if (m[3]) {
+                    const KW = ['print', 'if', 'else', 'while', 'for', 'def', 'return'];
+                    tokens.push({ kind: KW.includes(m[3]) ? 'kw' : 'id', v: m[3] });
+                }
+                else if (m[4]) tokens.push({ kind: 'op', v: m[4] });
+                else if (m[5]) tokens.push({ kind: 'punct', v: m[5] });
+            }
+            return tokens;
+        }
+
+        function compile() {
+            const src = document.getElementById('src').value;
+            const tokens = tokenize(src);
+            const tokensEl = document.getElementById('out-tokens');
+            tokensEl.innerHTML = '';
+            if (tokens.length === 0) { tokensEl.textContent = '(ingen tokens)'; return; }
+            tokens.forEach(t => {
+                const sp = document.createElement('span');
+                sp.className = 'cmp-token ' + t.kind;
+                sp.textContent = t.v;
+                tokensEl.appendChild(sp);
+            });
+
+            const tree = parseLine(tokens);
+            document.getElementById('out-tree').innerHTML = renderTree(tree);
+
+            const bc = bytecodeFor(tree);
+            document.getElementById('out-bytes').innerHTML = bc.map(b => `<div style="color: var(--neon-amber);">${b}</div>`).join('');
+
+            const out = runTree(tree);
+            document.getElementById('out-run').textContent = out;
+
+            runs++;
+            if (runs >= 3 && !Progress.has('komp')) {
+                if (Progress.give('komp', 0)) {
+                    setTimeout(() => Bitty.say(
+                        `<strong>Tre programmer kompilert!</strong> ⭐ Nøyaktig dette gjør ekte Python — bare med tusenvis av regler.`,
+                        { actions: [
+                            { label: 'Tilbake til hubben', callback: () => location.href = 'index.html' },
+                            { label: 'Prøv flere', muted: true, callback: () => Bitty.say('Skriv noe rart — se hva som skjer i tokenisering.') }
+                        ]}
+                    ), 400);
+                }
+            }
+        }
+
+        function parseLine(tokens) {
+            if (tokens.length === 0) return null;
+            if (tokens[0].kind === 'kw' && tokens[0].v === 'print') {
+                if (tokens[1]?.v !== '(') return { kind: 'error', msg: 'Forventet ( etter print' };
+                const inside = tokens.slice(2, -1);
+                if (tokens[tokens.length - 1].v !== ')') return { kind: 'error', msg: 'Mangler )' };
+                return { kind: 'print', arg: parseExpr(inside) };
+            }
+            if (tokens[0].kind === 'id' && tokens[1]?.v === '=') {
+                return { kind: 'assign', name: tokens[0].v, value: parseExpr(tokens.slice(2)) };
+            }
+            return { kind: 'expr', e: parseExpr(tokens) };
+        }
+        function parseExpr(tokens) {
+            if (tokens.length === 0) return { kind: 'empty' };
+            if (tokens.length === 1) {
+                const t = tokens[0];
+                if (t.kind === 'num') return { kind: 'num', v: parseInt(t.v) };
+                if (t.kind === 'str') return { kind: 'str', v: t.v.slice(1, -1) };
+                if (t.kind === 'id')  return { kind: 'var', v: t.v };
+            }
+            let acc = parseExpr([tokens[0]]);
+            let i = 1;
+            while (i < tokens.length - 1) {
+                const op = tokens[i];
+                const right = parseExpr([tokens[i + 1]]);
+                acc = { kind: 'op', op: op.v, l: acc, r: right };
+                i += 2;
+            }
+            return acc;
+        }
+        function renderTree(t, depth = 0) {
+            if (!t) return '(tomt)';
+            const indent = '&nbsp;&nbsp;'.repeat(depth);
+            if (t.kind === 'print')  return `${indent}print(<br>${renderTree(t.arg, depth+1)}<br>${indent})`;
+            if (t.kind === 'assign') return `${indent}${t.name} = <br>${renderTree(t.value, depth+1)}`;
+            if (t.kind === 'op')     return `${indent}(${t.op}<br>${renderTree(t.l, depth+1)}<br>${renderTree(t.r, depth+1)}<br>${indent})`;
+            if (t.kind === 'num')    return `${indent}<span class="cmp-token num">${t.v}</span>`;
+            if (t.kind === 'str')    return `${indent}<span class="cmp-token str">"${t.v}"</span>`;
+            if (t.kind === 'var')    return `${indent}<span class="cmp-token id">${t.v}</span>`;
+            if (t.kind === 'expr')   return renderTree(t.e, depth);
+            if (t.kind === 'error')  return `<span style="color:var(--neon-red)">${t.msg}</span>`;
+            return '(?)';
+        }
+
+        function bytecodeFor(t) {
+            const out = [];
+            function emit(node) {
+                if (!node) return;
+                if (node.kind === 'num')  out.push(`LOAD_CONST  ${node.v}`);
+                else if (node.kind === 'str') out.push(`LOAD_CONST  "${node.v}"`);
+                else if (node.kind === 'var') out.push(`LOAD_NAME   ${node.v}`);
+                else if (node.kind === 'op')  { emit(node.l); emit(node.r); out.push(`BINARY_OP   ${node.op}`); }
+                else if (node.kind === 'print') { out.push('LOAD_NAME   print'); emit(node.arg); out.push('CALL        1'); }
+                else if (node.kind === 'assign') { emit(node.value); out.push(`STORE_NAME  ${node.name}`); }
+                else if (node.kind === 'expr') emit(node.e);
+            }
+            emit(t);
+            return out;
+        }
+
+        const env = {};
+        function runTree(t) {
+            try {
+                if (!t) return '(ingenting)';
+                if (t.kind === 'print') return String(evalExpr(t.arg));
+                if (t.kind === 'assign') {
+                    const v = evalExpr(t.value); env[t.name] = v;
+                    return `${t.name} = ${JSON.stringify(v)}`;
+                }
+                if (t.kind === 'expr') return JSON.stringify(evalExpr(t.e));
+                if (t.kind === 'error') return 'Feil: ' + t.msg;
+            } catch (e) { return 'Feil: ' + e.message; }
+            return '(?)';
+        }
+        function evalExpr(n) {
+            if (!n) return '';
+            if (n.kind === 'num') return n.v;
+            if (n.kind === 'str') return n.v;
+            if (n.kind === 'var') {
+                if (!(n.v in env)) throw new Error(`Variabel ${n.v} ikke definert`);
+                return env[n.v];
+            }
+            if (n.kind === 'op') {
+                const a = evalExpr(n.l), b = evalExpr(n.r);
+                switch (n.op) { case '+': return a + b; case '-': return a - b; case '*': return a * b; case '/': return a / b; }
+            }
+            if (n.kind === 'expr') return evalExpr(n.e);
+            return null;
+        }
+
+        compile();
+
+        setTimeout(() => {
+            Bitty.say(
+                `Skriv en linje kode og trykk «Kompiler». Du ser den bli til tokens, tre, bytecode, og til slutt utført. Prøv minst tre forskjellige for stjernen.`,
+                { actions: [
+                    { label: 'Vis eksempelet', callback: () => { setSrc("print('hei')"); compile(); } }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPU-mølla</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>🧠 CPU-mølla</h1>
+            <p>CPU-en gjør tre ting i et evig samlebånd: <strong>henter</strong>, <strong>tolker</strong>, <strong>utfører</strong>.</p>
+        </div>
+
+        <div class="chamber">
+            <div class="assembly-line">
+                <div class="belt">
+                    <div class="station" data-stage="fetch" id="st-fetch">
+                        <h4>1. FETCH</h4>
+                        <div class="indicator"></div>
+                        <div class="holding-v2" id="stage-fetch">—</div>
+                    </div>
+                    <div class="station" data-stage="decode" id="st-decode">
+                        <h4>2. DECODE</h4>
+                        <div class="indicator"></div>
+                        <div class="holding-v2" id="stage-decode">—</div>
+                    </div>
+                    <div class="station" data-stage="execute" id="st-execute">
+                        <h4>3. EXECUTE</h4>
+                        <div class="indicator"></div>
+                        <div class="holding-v2" id="stage-execute">—</div>
+                    </div>
+                </div>
+
+                <div class="registers-v2">
+                    <div class="counter-reg"><div class="name">REG A</div><div class="digits" id="reg-A">00</div></div>
+                    <div class="counter-reg"><div class="name">REG B</div><div class="digits" id="reg-B">00</div></div>
+                    <div class="counter-reg"><div class="name">PC</div><div class="digits" id="reg-PC">00</div></div>
+                </div>
+            </div>
+
+            <h3 style="color: var(--neon-cyan); margin: 20px 0 10px; text-align:center;">Instruksjoner — dra inn i programmet</h3>
+            <div class="cpu-tray" id="tray"></div>
+
+            <h3 style="color: var(--neon-pink); margin: 16px 0 8px; text-align:center;">Programmet ditt</h3>
+            <div class="program-tape" id="program">
+                <div class="empty-msg">Dra instruksjoner hit …</div>
+            </div>
+
+            <div class="controls">
+                <button class="btn green" id="step-btn" onclick="step()">▶ Ett tikk</button>
+                <button class="btn pink" id="run-btn" onclick="runProgram()">⏭ Kjør hele</button>
+                <button class="btn outline" onclick="reset()">↺ Nullstill</button>
+                <span style="color: var(--neon-cyan); font-family: monospace; align-self:center;" id="clock">⏱ Klokketikk: 0</span>
+            </div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Hva skjer her?</summary>
+            <div class="info-body">
+                <p><strong>FETCH</strong> — henter neste instruksjon (PC peker på den).</p>
+                <p><strong>DECODE</strong> — tolker hva instruksjonen betyr.</p>
+                <p><strong>EXECUTE</strong> — gjør handlingen: et register endres, eller PC flyttes.</p>
+                <p>Din PC kjører dette mønsteret <em>milliarder</em> av ganger i sekundet.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        const INSTRUCTIONS = ['LOAD A, 5','LOAD A, 3','LOAD A, 10','LOAD B, 2','LOAD B, 3','LOAD B, 7','ADD A, B','SUB A, B','MUL A, B','PRINT A'];
+
+        let dragging = null;
+        let programLines = [];
+        let registers = { A: 0, B: 0, PC: 0 };
+        let pipelineState = { fetch: null, decode: null, execute: null };
+        let cycle = 0;
+        let printed = [];
+
+        function makeInstr(text) {
+            const d = document.createElement('div');
+            d.className = 'cpu-instr';
+            d.textContent = text;
+            d.draggable = true;
+            d.addEventListener('dragstart', () => { dragging = d; d.classList.add('dragging'); });
+            d.addEventListener('dragend', () => { d.classList.remove('dragging'); dragging = null; });
+            return d;
+        }
+
+        function buildTray() {
+            const tray = document.getElementById('tray');
+            tray.innerHTML = '';
+            INSTRUCTIONS.forEach(t => tray.appendChild(makeInstr(t)));
+        }
+
+        const programEl = document.getElementById('program');
+        programEl.addEventListener('dragover', e => { e.preventDefault(); programEl.classList.add('over'); });
+        programEl.addEventListener('dragleave', () => programEl.classList.remove('over'));
+        programEl.addEventListener('drop', e => {
+            e.preventDefault();
+            programEl.classList.remove('over');
+            if (!dragging) return;
+            programLines.push(dragging.textContent);
+            renderProgram();
+        });
+
+        function renderProgram() {
+            programEl.innerHTML = '';
+            if (programLines.length === 0) {
+                programEl.innerHTML = '<div class="empty-msg">Dra instruksjoner hit …</div>';
+                return;
+            }
+            programLines.forEach((line, i) => {
+                const d = document.createElement('div');
+                d.className = 'tape-row';
+                d.innerHTML =
+                    `<span class="pcmark">${i === registers.PC ? '►' : ''}</span>` +
+                    `<span>[${i}] ${line}</span>` +
+                    `<span class="x" title="Fjern">✕</span>`;
+                d.querySelector('.x').addEventListener('click', () => {
+                    programLines.splice(i, 1);
+                    if (registers.PC > programLines.length) registers.PC = programLines.length;
+                    renderProgram();
+                    updateRegs();
+                });
+                programEl.appendChild(d);
+            });
+        }
+
+        function pad(n) { return String(n).padStart(2, '0'); }
+        function updateRegs() {
+            document.getElementById('reg-A').textContent = pad(registers.A);
+            document.getElementById('reg-B').textContent = pad(registers.B);
+            document.getElementById('reg-PC').textContent = pad(registers.PC);
+        }
+
+        function renderPipeline() {
+            document.getElementById('stage-fetch').textContent   = pipelineState.fetch   || '—';
+            document.getElementById('stage-decode').textContent  = pipelineState.decode  || '—';
+            document.getElementById('stage-execute').textContent = pipelineState.execute || '—';
+            document.getElementById('st-fetch').classList.toggle('active', !!pipelineState.fetch);
+            document.getElementById('st-decode').classList.toggle('active', !!pipelineState.decode);
+            document.getElementById('st-execute').classList.toggle('active', !!pipelineState.execute);
+        }
+
+        function executeOne(instr) {
+            if (!instr) return;
+            const m = instr.match(/^LOAD (\w), (\d+)/);
+            if (m) { registers[m[1]] = parseInt(m[2]); return; }
+            if (instr === 'ADD A, B') { registers.A += registers.B; return; }
+            if (instr === 'SUB A, B') { registers.A -= registers.B; return; }
+            if (instr === 'MUL A, B') { registers.A *= registers.B; return; }
+            if (instr === 'PRINT A')  { printed.push(registers.A); flashPrint(registers.A); return; }
+        }
+
+        function flashPrint(val) { Bitty.say(`PRINT skriver ut: <strong style="font-size:1.5em">${val}</strong>`); }
+
+        function step() {
+            if (programLines.length === 0) {
+                Bitty.say('Bygg et program først!');
+                return;
+            }
+            if (pipelineState.execute) executeOne(pipelineState.execute);
+            pipelineState.execute = pipelineState.decode;
+            pipelineState.decode  = pipelineState.fetch;
+            pipelineState.fetch   = programLines[registers.PC] || null;
+            if (pipelineState.fetch) registers.PC++;
+            cycle++;
+            document.getElementById('clock').textContent = `⏱ Klokketikk: ${cycle}`;
+            renderPipeline();
+            renderProgram();
+            updateRegs();
+            checkGoal();
+        }
+
+        async function runProgram() {
+            if (programLines.length === 0) { Bitty.say('Bygg et program først!'); return; }
+            document.getElementById('run-btn').disabled = true;
+            document.getElementById('step-btn').disabled = true;
+            const totalSteps = programLines.length + 3;
+            for (let i = 0; i < totalSteps; i++) {
+                step();
+                await new Promise(r => setTimeout(r, 600));
+            }
+            document.getElementById('run-btn').disabled = false;
+            document.getElementById('step-btn').disabled = false;
+        }
+
+        function reset() {
+            programLines = [];
+            registers = { A: 0, B: 0, PC: 0 };
+            pipelineState = { fetch: null, decode: null, execute: null };
+            cycle = 0; printed = [];
+            document.getElementById('clock').textContent = '⏱ Klokketikk: 0';
+            renderProgram(); renderPipeline(); updateRegs();
+        }
+
+        let goal = null;
+        function setGoal() {
+            goal = 8;
+            Bitty.say(`Oppgave: lag et program som beregner <strong>5 + 3</strong> og skriver ut svaret. Bruk <code>LOAD A, 5</code>, <code>LOAD B, 3</code>, <code>ADD A, B</code>, <code>PRINT A</code>.`);
+        }
+
+        function checkGoal() {
+            if (goal !== null && printed.includes(goal)) {
+                if (Progress.give('cpu', 0)) {
+                    Bitty.say(
+                        `<strong>${goal}</strong> ut! ⭐ Akkurat slik fungerer ekte CPU-er — bare millioner av ganger raskere.`,
+                        { actions: [
+                            { label: 'Tilbake til hubben', callback: () => location.href = 'index.html' },
+                            { label: 'Lek videre', muted: true, callback: () => Bitty.say('Prøv 7 × 2, eller lag et program som ender på 0.') }
+                        ]}
+                    );
+                    goal = null;
+                }
+            }
+        }
+
+        buildTray(); renderProgram(); renderPipeline(); updateRegs();
+
+        setTimeout(() => {
+            Bitty.say(
+                `Velkommen til CPU-mølla! Tre stasjoner på samlebåndet. Bygg et lite program og se det rulle gjennom.`,
+                { actions: [
+                    { label: 'Gi meg en oppgave', callback: setGoal },
+                    { label: 'Jeg leker selv', muted: true, callback: () => Bitty.say('Prøv: LOAD A, 10 + LOAD B, 2 + MUL A, B + PRINT A.') }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>

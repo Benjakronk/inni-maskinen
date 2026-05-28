@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAM-biblioteket</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>📚 RAM-biblioteket</h1>
+            <p>Hver hylle har en <strong>adresse</strong>. Dra inn et kort, ta det ut igjen — slik husker maskinen.</p>
+        </div>
+
+        <div class="chamber">
+            <div class="library">
+                <div class="library-shelves" id="shelves"></div>
+            </div>
+
+            <div class="lending-desk">
+                <h3>📦 KORTBORD</h3>
+                <div class="tray" id="tray"></div>
+            </div>
+
+            <div class="controls">
+                <button class="power-switch" onclick="powerOff()">⚡ Skru av strøm</button>
+                <button class="btn outline" onclick="resetCards()">Hent kort</button>
+                <button class="btn pink" onclick="newQuest()">Gi meg en oppgave</button>
+            </div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Hvorfor «random access»?</summary>
+            <div class="info-body">
+                <p>CPU-en kan hente <em>hvilken som helst</em> hylle med en gang ved bare å spørre etter adressen. Det er det «random access» betyr.</p>
+                <p>Når du skriver <code>navn = "Anna"</code>, finner maskinen en ledig hylle, gir den et navn, og legger «Anna» dit. Det er en variabel.</p>
+                <p>Skrus strømmen av, glemmer RAM alt — derfor bruker vi disk for ting som skal overleve.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        const SHELF_COUNT = 16;
+        const initialCards = ['"Anna"', '42', 'true', '"hei"', '3.14', '"banan"', '0', '"🐱"'];
+        let dragging = null;
+
+        function makeShelf(addr) {
+            const sh = document.createElement('div');
+            sh.className = 'shelf-cell';
+            sh.dataset.addr = addr;
+            sh.innerHTML = `<div class="addr">[${addr}]</div>`;
+            sh.addEventListener('dragover', e => { e.preventDefault(); sh.classList.add('over'); });
+            sh.addEventListener('dragleave', () => sh.classList.remove('over'));
+            sh.addEventListener('drop', e => {
+                e.preventDefault();
+                sh.classList.remove('over');
+                if (!dragging) return;
+                const existing = sh.querySelector('.value-card-v2');
+                if (existing && existing !== dragging) {
+                    document.getElementById('tray').appendChild(existing);
+                    existing.classList.remove('in-shelf');
+                }
+                sh.appendChild(dragging);
+                dragging.classList.add('in-shelf');
+                sh.classList.add('has-item');
+            });
+            return sh;
+        }
+
+        function makeCard(text) {
+            const c = document.createElement('div');
+            c.className = 'value-card-v2';
+            c.textContent = text;
+            c.draggable = true;
+            c.addEventListener('dragstart', () => { dragging = c; c.classList.add('dragging'); });
+            c.addEventListener('dragend', () => { c.classList.remove('dragging'); dragging = null; refreshHasItem(); });
+            return c;
+        }
+
+        function refreshHasItem() {
+            document.querySelectorAll('.shelf-cell').forEach(s => {
+                s.classList.toggle('has-item', !!s.querySelector('.value-card-v2'));
+            });
+        }
+
+        const tray = document.getElementById('tray');
+        const shelvesEl = document.getElementById('shelves');
+
+        function build() {
+            shelvesEl.innerHTML = '';
+            for (let i = 0; i < SHELF_COUNT; i++) shelvesEl.appendChild(makeShelf(i));
+            tray.addEventListener('dragover', e => e.preventDefault());
+            tray.addEventListener('drop', e => {
+                e.preventDefault();
+                if (dragging) { tray.appendChild(dragging); dragging.classList.remove('in-shelf'); refreshHasItem(); }
+            });
+            resetCards();
+        }
+
+        function resetCards() {
+            tray.innerHTML = '';
+            initialCards.forEach(v => tray.appendChild(makeCard(v)));
+            refreshHasItem();
+        }
+
+        function powerOff() {
+            const inShelves = document.querySelectorAll('.shelf-cell .value-card-v2');
+            if (!inShelves.length) {
+                Bitty.say('Hyllene er allerede tomme. Legg noe inn først, så skru av — så ser du hva som skjer.');
+                return;
+            }
+            inShelves.forEach(card => {
+                card.style.transition = 'opacity 0.5s, transform 0.5s';
+                card.style.opacity = 0;
+                card.style.transform = 'translateY(20px) rotate(15deg)';
+            });
+            setTimeout(() => {
+                inShelves.forEach(c => c.remove());
+                refreshHasItem();
+                Bitty.say(
+                    `<strong>BLAFF!</strong> Alle hyllene er tomme. Det er det som skjer når du skrur av PC-en — RAM glemmer alt.`,
+                    { actions: [
+                        { label: 'Hent kort tilbake', callback: resetCards }
+                    ]}
+                );
+            }, 600);
+        }
+
+        let questAddr = null, questValue = null, solvedQuests = 0;
+        const QUEST_GOAL = 3;
+
+        function newQuest() {
+            const filled = [...document.querySelectorAll('.shelf-cell')].filter(s => s.querySelector('.value-card-v2'));
+            if (filled.length === 0) {
+                Bitty.say('Først må du legge minst ett kort i en hylle, så kan jeg gi deg en oppgave.');
+                return;
+            }
+            const sh = filled[Math.floor(Math.random() * filled.length)];
+            questAddr = parseInt(sh.dataset.addr);
+            questValue = sh.querySelector('.value-card-v2').textContent;
+            Bitty.say(
+                `Lat som om jeg er CPU-en og spør: <em>«hva ligger på adresse [${questAddr}]?»</em> Riktig svar er <code>${questValue}</code>.`,
+                { actions: [
+                    { label: 'Bekreft hylle [' + questAddr + ']', callback: answerQuest }
+                ]}
+            );
+        }
+
+        function answerQuest() {
+            const sh = document.querySelector(`.shelf-cell[data-addr="${questAddr}"]`);
+            const card = sh && sh.querySelector('.value-card-v2');
+            if (!card) {
+                Bitty.say('Hylla er tom! Noen tok bort kortet. Legg det inn igjen først.');
+                return;
+            }
+            if (card.textContent === questValue) {
+                solvedQuests++;
+                if (solvedQuests >= QUEST_GOAL) {
+                    if (Progress.give('ram', 0)) {
+                        Bitty.say(
+                            `<strong>Tre på rad!</strong> ⭐ Akkurat slik henter CPU-en variabler — adresse inn, verdi ut.`,
+                            { actions: [
+                                { label: 'Tilbake til hubben', callback: () => location.href = 'index.html' },
+                                { label: 'Bli og lek', muted: true, callback: () => Bitty.say('Prøv «Skru av strøm» — du får en overraskelse.') }
+                            ]}
+                        );
+                    } else {
+                        Bitty.say('Riktig — som vanlig!');
+                    }
+                } else {
+                    Bitty.say(`Riktig! ${QUEST_GOAL - solvedQuests} igjen.`, {
+                        actions: [{ label: 'Ny oppgave', callback: newQuest }]
+                    });
+                }
+            } else {
+                Bitty.say(`Hmm — på [${questAddr}] står det nå <code>${card.textContent}</code>. Jeg ba om <code>${questValue}</code>.`);
+            }
+        }
+
+        build();
+
+        setTimeout(() => {
+            Bitty.say(
+                `Velkommen til biblioteket! Dra noen kort fra kortbordet opp i hyllene. Si fra når du er klar for en oppgave.`,
+                { actions: [
+                    { label: 'Klar — gi meg en oppgave', callback: newQuest },
+                    { label: 'Bare la meg leke', muted: true, callback: () => Bitty.say('Som du vil! Trykk «Skru av strøm» når du er ferdig.') }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>

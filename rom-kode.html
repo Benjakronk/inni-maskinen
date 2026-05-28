@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koderommet</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .code-stage-2 {
+            display: grid;
+            grid-template-columns: minmax(320px, 1fr) 280px;
+            gap: 24px;
+            align-items: start;
+        }
+        @media (max-width: 720px) { .code-stage-2 { grid-template-columns: 1fr; } }
+
+        .pgm-area {
+            margin-top: 18px;
+        }
+        .pgm-area .scroll-bg {
+            min-height: 260px;
+        }
+        .pgm-area .pgm-list {
+            max-height: 70vh;
+            min-height: 200px;
+        }
+
+        .level-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+            padding: 8px 14px;
+            background: rgba(75,225,255,0.08);
+            border: 1px solid rgba(75,225,255,0.3);
+            border-radius: 8px;
+        }
+        .level-bar .lvl-title { color: var(--neon-cyan); font-family: monospace; font-weight: bold; }
+        .level-bar .lvl-stars { letter-spacing: 4px; font-size: 1.1em; }
+        .level-bar .lvl-stars .s-on  { color: #ffd966; }
+        .level-bar .lvl-stars .s-off { color: rgba(255,255,255,0.2); }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>🧩 Koderommet</h1>
+            <p>Bygg et program som får roboten til 🚩.</p>
+        </div>
+
+        <div class="chamber">
+            <div class="level-bar">
+                <span class="lvl-title" id="lvl-title">Bane 1 av 3</span>
+                <span class="lvl-desc" id="lvl-desc" style="color: var(--ink-soft); font-size: 0.9em;"></span>
+                <span class="lvl-stars" id="lvl-stars"></span>
+            </div>
+
+            <div class="code-stage-2">
+                <div>
+                    <div class="world-frame">
+                        <div class="world-grid" id="grid"></div>
+                    </div>
+                    <div class="controls">
+                        <button class="btn green" onclick="runProgram()">▶ Kjør</button>
+                        <button class="btn outline" onclick="resetWorld()">↺ Reset</button>
+                        <button class="btn pink" onclick="clearProgram()">🗑 Tøm</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="toolbox">
+                        <h3>🧰 VERKTØYKASSE</h3>
+                        <div class="tools">
+                            <div class="block-v2 act" draggable="true" data-type="forward">⬆ Gå frem</div>
+                            <div class="block-v2 act" draggable="true" data-type="left">↺ Snu venstre</div>
+                            <div class="block-v2 act" draggable="true" data-type="right">↻ Snu høyre</div>
+                            <div class="block-v2 loop" draggable="true" data-type="repeat">🔁 Gjenta N ganger</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pgm-area">
+                <div class="scroll-bg">
+                    <h3>📜 PROGRAMMET DITT</h3>
+                    <div class="pgm-list" id="program"></div>
+                </div>
+            </div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Hva er et program?</summary>
+            <div class="info-body">
+                <p>Et program er en oppskrift datamaskinen følger steg for steg:</p>
+                <ul style="margin-left: 20px; line-height: 1.7;">
+                    <li><strong>Handlinger</strong> — gjør én ting</li>
+                    <li><strong>Løkker</strong> — gjenta noe N ganger</li>
+                    <li><strong>Beslutninger</strong> — hvis X, gjør Y</li>
+                </ul>
+                <p>Når du skriver Python eller JavaScript senere er det samme idé — bare med ord.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        // Tre baner — gradvis vanskeligere. Roboten starter alltid mot høyre.
+        const LEVELS = [
+            {
+                name: 'Rett frem og ned',
+                desc: 'En vegg sperrer veien. Gå rundt.',
+                cols: 5, rows: 4,
+                world: [
+                    [0,0,0,0,0],
+                    [1,1,1,1,0],
+                    [0,0,0,0,0],
+                    [0,0,0,0,'G'],
+                ],
+                start: { x: 0, y: 0, dir: 0 },
+                hint: 'Gå frem 4, snu høyre, gå frem 3.'
+            },
+            {
+                name: 'Sikksakk',
+                desc: 'To vegger — du må svinge to ganger.',
+                cols: 6, rows: 5,
+                world: [
+                    [0,0,0,1,0,0],
+                    [0,1,0,1,0,0],
+                    [0,1,0,0,0,0],
+                    [0,1,1,1,1,0],
+                    [0,0,0,0,0,'G'],
+                ],
+                start: { x: 0, y: 0, dir: 1 }, // peker nedover
+                hint: 'Roboten ser nedover. Frem 4 (helt ned langs venstre kant), snu venstre (nå mot høyre), frem 5 → flagg.'
+            },
+            {
+                name: 'Spiralen',
+                desc: 'Bruk løkker — ellers blir programmet svært langt.',
+                cols: 6, rows: 6,
+                world: [
+                    [0,0,0,0,0,0],
+                    [0,1,1,1,1,0],
+                    [0,1,0,0,1,0],
+                    [0,1,0,'G',1,0],
+                    [0,1,0,0,0,0],
+                    [0,0,0,0,0,0],
+                ],
+                start: { x: 0, y: 0, dir: 0 },
+                hint: 'Gå rundt utsiden først, så inn fra bunnen. Frem 5, høyre, frem 5, høyre, frem 3, høyre, frem 2, høyre, frem 1 — nå er du på flagget.'
+            }
+        ];
+
+        let levelIdx = 0;
+        let cur = LEVELS[0];
+        let player = { ...cur.start };
+        let program = [];
+        let dragSource = null, dragData = null;
+        let isRunning = false;
+
+        function loadLevel(idx) {
+            levelIdx = idx;
+            cur = LEVELS[idx];
+            player = { ...cur.start };
+            program = [];
+            renderLevelBar();
+            buildGrid();
+            render();
+        }
+
+        function renderLevelBar() {
+            document.getElementById('lvl-title').textContent = `Bane ${levelIdx+1} av ${LEVELS.length}: ${cur.name}`;
+            document.getElementById('lvl-desc').textContent = cur.desc;
+            const stars = LEVELS.map((_, i) =>
+                `<span class="${Progress.has('kode', i) ? 's-on' : 's-off'}">★</span>`
+            ).join('');
+            document.getElementById('lvl-stars').innerHTML = stars;
+        }
+
+        function buildGrid() {
+            const g = document.getElementById('grid');
+            g.style.gridTemplateColumns = `repeat(${cur.cols}, 56px)`;
+            g.innerHTML = '';
+            for (let y = 0; y < cur.rows; y++) {
+                for (let x = 0; x < cur.cols; x++) {
+                    const c = document.createElement('div');
+                    c.className = 'world-tile';
+                    c.dataset.x = x; c.dataset.y = y;
+                    if (cur.world[y][x] === 1) c.classList.add('wall');
+                    if (cur.world[y][x] === 'G') c.classList.add('goal');
+                    g.appendChild(c);
+                }
+            }
+            renderPlayer();
+        }
+        function renderPlayer() {
+            document.querySelectorAll('.world-tile').forEach(t => {
+                t.classList.remove('player', 'dir-0','dir-1','dir-2','dir-3');
+            });
+            const t = [...document.querySelectorAll('.world-tile')]
+                .find(t => +t.dataset.x === player.x && +t.dataset.y === player.y);
+            if (t) { t.classList.add('player'); t.classList.add('dir-' + player.dir); }
+        }
+
+        function moveForward() {
+            const dx = [1, 0, -1, 0][player.dir];
+            const dy = [0, 1, 0, -1][player.dir];
+            const nx = player.x + dx, ny = player.y + dy;
+            if (nx < 0 || ny < 0 || nx >= cur.cols || ny >= cur.rows) {
+                Bitty.say('Roboten ville gått av kartet — handlingen ble hoppet over.'); return false;
+            }
+            if (cur.world[ny][nx] === 1) {
+                Bitty.say('Det er en vegg foran! Roboten klarte ikke å gå frem.'); return false;
+            }
+            player.x = nx; player.y = ny; renderPlayer(); return true;
+        }
+        function turnLeft()  { player.dir = (player.dir + 3) % 4; renderPlayer(); }
+        function turnRight() { player.dir = (player.dir + 1) % 4; renderPlayer(); }
+
+        function makeBlock(type) {
+            if (type === 'repeat') return { type: 'repeat', n: 3, body: [] };
+            return { type };
+        }
+
+        function render() {
+            const root = document.getElementById('program');
+            root.innerHTML = '';
+            program.forEach((b, i) => root.appendChild(renderBlock(b, program, i)));
+        }
+
+        function renderBlock(b, parentList, index) {
+            const el = document.createElement('div');
+            el.className = 'pgm-block-v2';
+            if (b.type === 'forward')      el.innerHTML = `<span>⬆ Gå frem</span><span class="x-v2">✕</span>`;
+            else if (b.type === 'left')    el.innerHTML = `<span>↺ Snu venstre</span><span class="x-v2">✕</span>`;
+            else if (b.type === 'right')   el.innerHTML = `<span>↻ Snu høyre</span><span class="x-v2">✕</span>`;
+            else if (b.type === 'repeat') {
+                el.classList.add('loop');
+                el.innerHTML = `
+                    <div class="head">
+                        <span>🔁 Gjenta <input type="number" min="1" max="20" class="loop-input-v2" value="${b.n}"> ganger:</span>
+                        <span class="x-v2">✕</span>
+                    </div>
+                    <div class="body-v2" data-loop></div>
+                `;
+                const inp = el.querySelector('.loop-input-v2');
+                inp.addEventListener('change', () => {
+                    let v = parseInt(inp.value); if (isNaN(v) || v < 1) v = 1; if (v > 20) v = 20;
+                    b.n = v; inp.value = v;
+                });
+                inp.addEventListener('click', e => e.stopPropagation());
+                const bodyEl = el.querySelector('.body-v2');
+                b.body.forEach((c, ci) => bodyEl.appendChild(renderBlock(c, b.body, ci)));
+                bodyEl.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); bodyEl.classList.add('over'); });
+                bodyEl.addEventListener('dragleave', () => bodyEl.classList.remove('over'));
+                bodyEl.addEventListener('drop', e => {
+                    e.preventDefault(); e.stopPropagation();
+                    bodyEl.classList.remove('over');
+                    handleDrop(b.body);
+                });
+            }
+            el.querySelector('.x-v2')?.addEventListener('click', e => {
+                e.stopPropagation();
+                parentList.splice(index, 1); render();
+            });
+            return el;
+        }
+
+        document.querySelectorAll('.toolbox .block-v2').forEach(b => {
+            b.addEventListener('dragstart', () => {
+                dragSource = 'palette';
+                dragData = { type: b.dataset.type };
+            });
+        });
+
+        const programEl = document.getElementById('program');
+        programEl.addEventListener('dragover', e => { e.preventDefault(); programEl.classList.add('over'); });
+        programEl.addEventListener('dragleave', () => programEl.classList.remove('over'));
+        programEl.addEventListener('drop', e => {
+            e.preventDefault(); programEl.classList.remove('over');
+            handleDrop(program);
+        });
+
+        function handleDrop(targetList) {
+            if (dragSource === 'palette' && dragData) {
+                targetList.push(makeBlock(dragData.type));
+                render();
+            }
+            dragSource = null; dragData = null;
+        }
+
+        function clearProgram() { program = []; render(); }
+        function resetWorld() { player = { ...cur.start }; renderPlayer(); }
+
+        async function runProgram() {
+            if (isRunning) return;
+            isRunning = true;
+            resetWorld();
+            const steps = flatten(program);
+            for (const step of steps) {
+                if (step === 'forward') { if (!moveForward()) break; }
+                else if (step === 'left')  turnLeft();
+                else if (step === 'right') turnRight();
+                await delay(380);
+                if (cur.world[player.y][player.x] === 'G') {
+                    onWin();
+                    break;
+                }
+            }
+            isRunning = false;
+        }
+
+        function onWin() {
+            const newStar = Progress.give('kode', levelIdx);
+            renderLevelBar();
+            const isLast = levelIdx === LEVELS.length - 1;
+            const allDone = LEVELS.every((_, i) => Progress.has('kode', i));
+
+            const actions = [];
+            if (!isLast) {
+                actions.push({ label: 'Neste bane →', callback: () => { loadLevel(levelIdx + 1); Bitty.say(`<strong>Bane ${levelIdx+1}:</strong> ${cur.desc}`, { actions: [{ label: 'Hint', callback: () => Bitty.say(cur.hint) }, { label: 'Greit', muted: true, callback: () => {} }]}); } });
+            }
+            actions.push({ label: 'Tilbake til hubben', muted: !isLast, callback: () => location.href = 'index.html' });
+            if (!allDone || !isLast) actions.push({ label: 'Prøv igjen', muted: true, callback: () => { resetWorld(); } });
+
+            const msg = newStar
+                ? (allDone
+                    ? `<strong>Alle tre baner ferdig!</strong> ⭐⭐⭐ Du har sett hvordan instruksjoner og løkker kan løse problemer som ville krevd hundrevis av enkelt-trinn.`
+                    : `<strong>Mål!</strong> ⭐ Bane ${levelIdx+1} er løst. ${isLast ? '' : 'Klar for neste?'}`)
+                : `🎉 Mål igjen! Du har allerede stjernen for denne banen.`;
+            setTimeout(() => Bitty.say(msg, { actions }), 500);
+        }
+
+        function flatten(blocks) {
+            const out = [];
+            blocks.forEach(b => {
+                if (b.type === 'repeat') for (let i = 0; i < b.n; i++) out.push(...flatten(b.body));
+                else out.push(b.type);
+            });
+            return out;
+        }
+        function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        loadLevel(0);
+
+        setTimeout(() => {
+            Bitty.say(
+                `Robot 🤖 må til flagget 🚩. Tre baner venter — hver litt vanskeligere. Dra blokker fra verktøykassen ned i programmet og trykk «Kjør».`,
+                { actions: [
+                    { label: 'Hint for denne banen', callback: () => Bitty.say(cur.hint) },
+                    { label: 'Vis løkke-eksempel', callback: () => Bitty.say(
+                        `Sånn ser en løkke ut:<br>` +
+                        `<code>🔁 Gjenta 4 → ⬆ Gå frem</code><br>` +
+                        `Drar du «Gjenta» ned først, kan du dra «Gå frem» <em>inn i</em> den.`
+                    ) },
+                    { label: 'Jeg prøver selv', muted: true, callback: () => Bitty.say('«Høyre» er fra robotens ståsted, ikke ditt!') }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>

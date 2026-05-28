@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disk-arkivet</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Hub</a>
+
+    <div class="scene">
+        <div class="scene-title">
+            <h1>💾 Disk-arkivet</h1>
+            <p><strong>RAM</strong> = rask men glemsk. <strong>Disk</strong> = tregere, men husker selv ved strømbrudd.</p>
+        </div>
+
+        <div class="chamber">
+            <div class="lending-desk" style="margin-top:0;">
+                <h3>📦 DOKUMENTER PÅ PULTEN</h3>
+                <div class="tray" id="docs"></div>
+            </div>
+
+            <div class="disk-stage" style="margin-top:18px;">
+                <div class="storage-bay ram-bay">
+                    <h3 style="color: var(--neon-amber);">⚡ RAM — lynraskt</h3>
+                    <div class="descriptor">Glemmer ved strømbrudd</div>
+                    <div class="chips" id="ram-slots"></div>
+                </div>
+                <div class="storage-bay" style="position:relative;">
+                    <h3 style="color: var(--neon-green);">🐢 DISK — husker</h3>
+                    <div class="descriptor">Tregere — men varig</div>
+                    <div class="platter-stack" id="platter"></div>
+                    <div class="chips" id="disk-slots"></div>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="power-switch" onclick="powerOff()">⚡ Skru av strøm</button>
+                <button class="btn outline" onclick="resetAll()">Start på nytt</button>
+                <button class="btn pink" onclick="startChallenge()">Gi meg oppdrag</button>
+            </div>
+        </div>
+
+        <details class="info-toggle">
+            <summary>📜 Hvorfor finnes begge?</summary>
+            <div class="info-body">
+                <p>RAM ligger fysisk nærmere CPU-en og kan svare på nanosekunder. Disk er lengre unna, mye tregere — men har plass til 1000× mer data.</p>
+                <p>Når du «lagrer» et dokument, sender maskinen kopien fra RAM til disken. Når du åpner det igjen, kommer det tilbake til RAM.</p>
+            </div>
+        </details>
+    </div>
+
+    <div class="bitty-bar">
+        <div class="bitty"><div class="bitty-mouth"></div><div class="bitty-label">Bitty</div></div>
+        <div class="bitty-bubble">
+            <div class="bubble-text"></div>
+            <div class="bitty-actions"></div>
+        </div>
+    </div>
+
+    <script src="bitty.js"></script>
+    <script src="progress.js"></script>
+    <script>
+        const documents = ['stil.txt', 'matte.docx', 'bilde.jpg', 'sang.mp3', 'oppskrift.txt', 'notat.md'];
+        let dragging = null;
+        let challengeStarted = false;
+        let savedDuringChallenge = false;
+
+        function makeDoc(name) {
+            const d = document.createElement('div');
+            d.className = 'value-card-v2';
+            d.textContent = '📄 ' + name;
+            d.draggable = true;
+            d.addEventListener('dragstart', () => { dragging = d; d.classList.add('dragging'); });
+            d.addEventListener('dragend', () => { d.classList.remove('dragging'); dragging = null; });
+            return d;
+        }
+
+        function makeSlots(parent, n, isDisk) {
+            for (let i = 0; i < n; i++) {
+                const s = document.createElement('div');
+                s.className = 'slot-v2';
+                s.dataset.disk = isDisk ? 'true' : 'false';
+                s.addEventListener('dragover', e => { e.preventDefault(); s.classList.add('over'); });
+                s.addEventListener('dragleave', () => s.classList.remove('over'));
+                s.addEventListener('drop', e => {
+                    e.preventDefault();
+                    s.classList.remove('over');
+                    if (!dragging) return;
+                    if (isDisk) {
+                        const platter = document.getElementById('platter');
+                        platter.classList.add('busy');
+                        const frozen = dragging;
+                        dragging = null;
+                        setTimeout(() => {
+                            const old = s.querySelector('.value-card-v2');
+                            if (old && old !== frozen) document.getElementById('docs').appendChild(old);
+                            s.appendChild(frozen);
+                            platter.classList.remove('busy');
+                            if (challengeStarted) savedDuringChallenge = true;
+                        }, 900);
+                    } else {
+                        const old = s.querySelector('.value-card-v2');
+                        if (old && old !== dragging) document.getElementById('docs').appendChild(old);
+                        s.appendChild(dragging);
+                    }
+                });
+                parent.appendChild(s);
+            }
+        }
+
+        function build() {
+            document.getElementById('ram-slots').innerHTML = '';
+            document.getElementById('disk-slots').innerHTML = '';
+            makeSlots(document.getElementById('ram-slots'), 4, false);
+            makeSlots(document.getElementById('disk-slots'), 4, true);
+
+            const tray = document.getElementById('docs');
+            tray.innerHTML = '';
+            documents.forEach(d => tray.appendChild(makeDoc(d)));
+            tray.addEventListener('dragover', e => e.preventDefault());
+            tray.addEventListener('drop', e => {
+                e.preventDefault();
+                if (dragging) tray.appendChild(dragging);
+            });
+        }
+
+        function powerOff() {
+            const ramDocs = document.querySelectorAll('#ram-slots .value-card-v2');
+            if (ramDocs.length === 0) {
+                Bitty.say('Det er ingen dokumenter i RAM ennå. Dra noe inn i RAM først, så skru av.');
+                return;
+            }
+            ramDocs.forEach(d => {
+                d.style.transition = 'opacity 0.6s, transform 0.6s';
+                d.style.opacity = 0;
+                d.style.transform = 'translateY(20px) rotate(8deg)';
+            });
+            setTimeout(() => {
+                const tray = document.getElementById('docs');
+                ramDocs.forEach(d => { d.remove(); tray.appendChild(makeDoc(d.textContent.replace('📄 ',''))); });
+
+                const diskDocs = document.querySelectorAll('#disk-slots .value-card-v2');
+                if (diskDocs.length > 0) {
+                    Bitty.say(`Se! RAM tømte seg helt — men <strong>disken har fortsatt alt</strong>. Det er hele forskjellen.`);
+                    if (challengeStarted && savedDuringChallenge) winChallenge();
+                } else {
+                    Bitty.say(`RAM tømte seg — og disken hadde ingenting. Alt er borte. Prøv å dra noe til disken først.`);
+                }
+            }, 700);
+        }
+
+        function resetAll() { build(); }
+
+        function startChallenge() {
+            challengeStarted = true;
+            savedDuringChallenge = false;
+            Bitty.say(`Oppdrag: dra et dokument til <strong>RAM</strong>, så til <strong>disk</strong> (se HDD-platen spinne raskere når du lagrer!). Deretter trykk «Skru av strøm».`);
+        }
+
+        function winChallenge() {
+            challengeStarted = false;
+            if (Progress.give('disk', 0)) {
+                Bitty.say(
+                    `<strong>Du fikk det!</strong> ⭐ Disk = treg men evig. RAM = rask men glemsk.`,
+                    { actions: [{ label: 'Tilbake til hubben', callback: () => location.href = 'index.html' }] }
+                );
+            } else {
+                Bitty.say('Du har gjort dette før — men det er like fascinerende hver gang.');
+            }
+        }
+
+        build();
+
+        setTimeout(() => {
+            Bitty.say(
+                `To slags lager. <strong>RAM</strong> til venstre pulserer — den jobber hele tiden. <strong>Disk</strong> til høyre har en spinning plate. Dra et dokument til hver — se forskjellen!`,
+                { actions: [
+                    { label: 'Gi meg et oppdrag', callback: startChallenge },
+                    { label: 'Jeg eksperimenterer selv', muted: true, callback: () => Bitty.say('Bra! Legg merke til at disken bruker tid på å lagre — RAM er øyeblikkelig.') }
+                ]}
+            );
+        }, 400);
+    </script>
+</body>
+</html>
